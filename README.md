@@ -1,4 +1,4 @@
 biggus
 ======
 
-Virtual large arrays and lazy evaluation
+Virtual large arrays and lazy evaluation.
