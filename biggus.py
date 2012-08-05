@@ -30,8 +30,24 @@ arithmetic) are performed in a lazy fashion to avoid overloading system
 resources. Operations which reduce the size (e.g. taking the arithmetic
 mean) will return a NumPy ndarray.
 
+Example:
+    # Wrap two large data sources (e.g. 52000 x 800 x 600).
+    measured = ArrayAdapter(netcdf_var_a)
+    predicted = ArrayAdapter(netcdf_var_b)
+
+    # No actual calculations are performed here.
+    error = predicted - measured
+
+    # Calculate the mean over the first dimension, and return a real
+    # NumPy ndarray. This is when the data is actually read,
+    # subtracted, and the mean derived, but all in a chunk-by-chunk
+    # fashion which avoids using much memory.
+    mean_error = biggus.mean(error, axis=0)
+
 """
 from abc import ABCMeta, abstractproperty, abstractmethod
+
+import numpy
 
 
 class Array(object):
@@ -42,13 +58,14 @@ class Array(object):
     """
     __metaclass__ = ABCMeta
 
-    @abstractproperty
-    def dtype(self):
-        """The datatype of this virtual array."""
-
+    @property
     def ndim(self):
         """The number of dimensions in this virtual array."""
         return len(self.shape)
+
+    @abstractproperty
+    def dtype(self):
+        """The datatype of this virtual array."""
 
     @abstractproperty
     def shape(self):
@@ -65,3 +82,126 @@ class Array(object):
         virtual array.
 
         """
+
+
+class ArrayAdapter(Array):
+    """
+    Exposes a "concrete" array (e.g. numpy.ndarray, netCDF4.Variable)
+    as an Array.
+
+    """
+    def __init__(self, concrete, keys=None):
+        # concrete has:
+        #   dtype
+        #   ndim
+        self._concrete = concrete
+        if keys is not None:
+            if not isinstance(keys, tuple):
+                keys = (keys,)
+            assert len(keys) <= concrete.ndim
+        self._keys = keys
+
+    @property
+    def dtype(self):
+        return self._concrete.dtype
+
+    @property
+    def shape(self):
+        if self._keys is None:
+            shape = self._concrete.shape
+        else:
+            shape = _sliced_shape(self._concrete.shape, self._keys)
+        return shape
+
+    def __getitem__(self, keys):
+        # TODO: Support "sub-indexing"
+        if self._keys is not None:
+            raise NotImplementedError('Patience!')
+        return ArrayAdapter(self._concrete, keys)
+
+    def __repr__(self):
+        return '<ArrayAdapter shape={} dtype={}>'.format(
+            self.shape, self.dtype)
+
+    def ndarray(self):
+        if self._keys is None:
+            array = self._concrete[:]
+        else:
+            array = self._concrete.__getitem__(self._keys)
+            # We want the shape of the result to match the shape of the
+            # Array, so where we've ended up with an array-scalar,
+            # "inflate" it back to a 0-dimensional array.
+            if array.ndim == 0:
+                array = numpy.array(array)
+        return array
+
+
+def mean(a, axis=None):
+    """
+    Returns the mean of a BigArray as a NumPy ndarray.
+
+    NB. Currently limited to axis=0.
+
+    """
+    assert axis == 0
+    #   chunk_size = 2      => 54s ~ 115% CPU
+    #   chunk_size = 10     => 42s ~ 105% CPU (quicker than CDO!)
+    #   chunk_size = 100    => 54s
+    #   chunk_size = 1000   => 63s
+    size = a.shape[0]
+    chunk_size = 10
+    condition = threading.Condition()
+    chunks = []
+    def read():
+        for i in range(1, size, chunk_size):
+            chunk = a[i:i + chunk_size].ndarray()
+            with condition:
+                chunks.append(chunk)
+                condition.notify()
+        with condition:
+            chunks.append(None)
+            condition.notify()
+    producer = threading.Thread(target=read)
+    producer.start()
+
+    total = a[0].ndarray()
+    t = numpy.empty_like(total)
+    while True:
+        with condition:
+            while not chunks and producer.is_alive():
+                condition.wait(1)
+            chunk = chunks.pop(0)
+        if chunk is None:
+            break
+        numpy.sum(chunk, axis=0, out=t)
+        total += t
+    return numpy.divide(total, size, out=total)
+
+
+# TODO: Test
+def _sliced_shape(shape, keys):
+    """
+    Returns the shape that results from slicing an array of the given
+    shape by the given keys.
+
+    e.g.
+        shape=(52350, 70, 90, 180)
+        keys= ( 0:10,  3,  :, 2:3)
+    gives:
+        sliced_shape=(10, 90, 1)
+
+    """
+    sliced_shape = []
+    # TODO: Watch out for more keys than shape entries.
+    # TODO: Support some sort of "fancy" indexing?
+    #   e.g. The first tuple in: keys=((0, 5, 12, 14), 3, :, 2:3)
+    for size, key in map(None, shape, keys):
+        if isinstance(key, int):
+            continue
+        elif isinstance(key, slice):
+            size = len(range(*key.indices(size)))
+            sliced_shape.append(size)
+        else:
+            sliced_shape.append(size)
+    sliced_shape = tuple(sliced_shape)
+    return sliced_shape
