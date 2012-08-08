@@ -146,7 +146,7 @@ class ArrayAdapter(Array):
         if not isinstance(keys, tuple):
             keys = (keys,)
         if len(keys) > self.ndim:
-            raise IndexError('Too many keys')
+            raise IndexError('too many keys')
 
         result_keys = []
         shape = list(self._concrete.shape)
@@ -172,7 +172,7 @@ class ArrayAdapter(Array):
                 result_key = self._convert_key(new_key, size, start, stride)
                 result_keys.append(result_key)
             else:
-                raise TypeError('unsupported index type')
+                raise TypeError('invalid index: {!r}'.format(src_key))
 
         # Now mop up any remaining src or new keys.
         if src_keys:
@@ -206,9 +206,77 @@ class ArrayAdapter(Array):
         return array
 
 
+class ArrayStack(Array):
+    """
+    An Array made from a homogeneous array of other Arrays.
+
+    """
+    def __init__(self, stack):
+        first_array = stack.flat[0]
+        item_shape = first_array.shape
+        dtype = first_array.dtype
+        for array in stack.flat:
+            if array.shape != item_shape or array.dtype != dtype:
+                raise ValueError('invalid sub-array')
+        self._stack = stack
+        self._item_shape = item_shape
+        self._dtype = dtype
+
+    @property
+    def dtype(self):
+        return self._dtype
+
+    @property
+    def shape(self):
+        return self._stack.shape + self._item_shape
+
+    def __getitem__(self, keys):
+        if not isinstance(keys, tuple):
+            keys = (keys,)
+        if len(keys) > self.ndim:
+            raise IndexError('too many keys')
+        for key in keys:
+            if not(isinstance(key, int) or isinstance(key, slice)):
+                raise TypeError('invalid index: {!r}'.format(key))
+
+        stack_ndim = self._stack.ndim
+        stack_keys = keys[:stack_ndim]
+        item_keys = keys[stack_ndim:]
+
+        stack_shape = _sliced_shape(self._stack.shape, stack_keys)
+        if stack_shape:
+            stack = self._stack[stack_keys]
+            # If the result was 0D, convert it back to an array.
+            stack = numpy.array(stack)
+            for index in numpy.ndindex(stack_shape):
+                item = stack[index]
+                stack[index] = item[item_keys]
+            result = ArrayStack(stack)
+        else:
+            result = self._stack[stack_keys][item_keys]
+        return result
+
+    def __repr__(self):
+        return '<ArrayStack stack_shape={} item_shape={} dtype={}>'.format(
+            self._stack.shape, self._item_shape, self.dtype)
+
+    def __setitem__(self, keys, value):
+        assert len(keys) == self._stack.ndim
+        for key in keys:
+            assert isinstance(key, int)
+        assert isinstance(value, Array), type(value)
+        self._stack[keys] = value
+
+    def ndarray(self):
+        data = numpy.empty(self.shape, dtype=self.dtype)
+        for index in numpy.ndindex(self._stack.shape):
+            data[index] = self._stack[index].ndarray()
+        return data
+
+
 def mean(a, axis=None):
     """
-    Returns the mean of a BigArray as a NumPy ndarray.
+    Returns the mean of an Array as a NumPy ndarray.
 
     NB. Currently limited to axis=0.
 

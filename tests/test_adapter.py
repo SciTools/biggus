@@ -97,9 +97,6 @@ class TestAdapter(unittest.TestCase):
             [(30, 40), ['foo'], TypeError],
             [(30, 40), [object()], TypeError],
         ]
-        tests2 = [
-            [(30, 40), [3.5], TypeError],
-        ]
         for src_shape, cuts, target in tests:
             ndarray = numpy.zeros(src_shape)
             array = biggus.ArrayAdapter(ndarray)
@@ -130,7 +127,7 @@ class TestAdapter(unittest.TestCase):
             self.assertIsInstance(result, numpy.ndarray)
             self.assertEqual(array.dtype, result.dtype)
             self.assertEqual(array.shape, result.shape, '\nKeys: ' + `src_keys`)
-            numpy.testing.assert_array_equal(result, result)
+            numpy.testing.assert_array_equal(result, target)
 
 
 if __name__ == '__main__':
