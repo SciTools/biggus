@@ -22,6 +22,8 @@ import biggus
 
 
 class TestAdapter(unittest.TestCase):
+    longMessage = True
+
     def test_dtype(self):
         dtypes = ['f4', 'i1', 'O', 'm8', '<f4', '>f4', '=f4']
         keys = [None, (), (5,), (slice(1, 3),)]
@@ -69,20 +71,44 @@ class TestAdapter(unittest.TestCase):
             self.assertEqual(array.shape, shape)
 
     def test_getitem(self):
+        # Sequence of tests, defined as:
+        #   1. Original array shape,
+        #   2. sequence of indexing operations to apply,
+        #   3. expected result shape or exception.
         tests = [
-            [(30, 40), None, None, (30, 40)],
-            [(30, 40), None, (5,), (40,)],
-            [(30, 40), None, (slice(None, None), 6), (30,)],
-            [(30, 40), None, (slice(None, None), slice(1, 5)), (30, 4)],
-            # TODO: Test once implemented
-            #[(30, 40), (5,), (slice(None, None),), (40,)],
+            [(30, 40), [], (30, 40)],
+            [(30, 40), [5], (40,)],
+            [(30, 40), [(5,)], (40,)],
+            [(30, 40), [5, 3], ()],
+            [(30, 40), [(5,), (4,)], ()],
+            [(30, 40), [(slice(None, None), 6)], (30,)],
+            [(30, 40), [(slice(None, None), slice(1, 5))], (30, 4)],
+            [(30, 40), [(slice(None, None),), 4], (40,)],
+            [(30, 40), [5, (slice(None, None),)], (40,)],
+            [(30, 40), [(slice(None, 10),)], (10, 40)],
+            [(30, 40), [(slice(None, 10),), 5], (40,)],
+            [(30, 40), [(slice(None, 10),), (slice(None, 3),)], (3, 40)],
+            [(30, 40), [(slice(None, 10),), (slice(None, None, 2),)], (5, 40)],
+            [(30, 40), [(slice(5, 10),),
+                        (slice(None, None), slice(2, 6))], (5, 4)],
+            [(30, 40), [(slice(None, None), slice(2, 6)),
+                        (slice(5, 10),)], (5, 4)],
+            [(30, 40), [3.5], TypeError],
+            [(30, 40), ['foo'], TypeError],
+            [(30, 40), [object()], TypeError],
         ]
-        for src_shape, src_keys, keys, result_shape in tests:
+        for src_shape, cuts, target in tests:
             ndarray = numpy.zeros(src_shape)
-            array = biggus.ArrayAdapter(ndarray, keys=src_keys)
-            result = array.__getitem__(keys)
-            self.assertIsInstance(result, biggus.Array)
-            self.assertEqual(result.shape, result_shape)
+            array = biggus.ArrayAdapter(ndarray)
+            if isinstance(target, type):
+                with self.assertRaises(target):
+                    for cut in cuts:
+                        array = array.__getitem__(cut)
+            else:
+                for cut in cuts:
+                    array = array.__getitem__(cut)
+                    self.assertIsInstance(array, biggus.Array)
+                self.assertEqual(array.shape, target, '\nCuts: ' + `cuts`)
 
     def test_ndarray(self):
         tests = [
@@ -100,8 +126,8 @@ class TestAdapter(unittest.TestCase):
             result = array.ndarray()
             self.assertIsInstance(result, numpy.ndarray)
             self.assertEqual(array.dtype, result.dtype)
-            self.assertEqual(array.shape, result.shape)
-            numpy.testing.assert_array_equal(result, result)
+            self.assertEqual(array.shape, result.shape, '\nKeys: ' + `src_keys`)
+            numpy.testing.assert_array_equal(result, target)
 
 
 if __name__ == '__main__':

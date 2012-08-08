@@ -95,11 +95,17 @@ class ArrayAdapter(Array):
         #   dtype
         #   ndim
         self._concrete = concrete
+        result_keys = []
         if keys is not None:
             if not isinstance(keys, tuple):
                 keys = (keys,)
             assert len(keys) <= concrete.ndim
-        self._keys = keys
+            for key, size in zip(keys, concrete.shape):
+                result_key = self._convert_key(key, size, 0, 1)
+                result_keys.append(result_key)
+        # TODO: Check if we need self._keys set to None.
+        #   ... if not, remove all the `is None` checks.
+        self._keys = tuple(result_keys)
 
     @property
     def dtype(self):
@@ -113,11 +119,75 @@ class ArrayAdapter(Array):
             shape = _sliced_shape(self._concrete.shape, self._keys)
         return shape
 
+    def _convert_key(self, new_key, size, start, stride):
+        # Check if a key is valid for the given dimension size,
+        # and map it to the concrete array, accounting for the current
+        # start and stride in effect.
+        if isinstance(new_key, int):
+            # Is it a valid index?
+            if new_key < 0:
+                new_key += size
+            if new_key < 0 or new_key >= size:
+                raise IndexError('out of bounds')
+            # If so, map it back to the concrete array.
+            result_key = start + new_key * stride
+        elif isinstance(new_key, slice):
+            # Map the new slice back to the concrete array.
+            n_start, n_stop, n_stride = new_key.indices(size)
+            result_key = slice(start + stride * n_start,
+                               start + stride * n_stop,
+                               stride * n_stride)
+        else:
+            raise TypeError('invalid index: {!r}'.format(new_key))
+
+        return result_key
+
     def __getitem__(self, keys):
-        # TODO: Support "sub-indexing"
-        if self._keys is not None:
-            raise NotImplementedError('Patience!')
-        return ArrayAdapter(self._concrete, keys)
+        if not isinstance(keys, tuple):
+            keys = (keys,)
+        if len(keys) > self.ndim:
+            raise IndexError('too many keys')
+
+        result_keys = []
+        shape = list(self._concrete.shape)
+        src_keys = list(self._keys or [])
+        new_keys = list(keys)
+
+        # While we still have both existing and incoming keys to
+        # deal with...
+        while src_keys and new_keys:
+            src_size = shape.pop(0)
+            src_key = src_keys.pop(0)
+            if isinstance(src_key, int):
+                # An integer src_key means this dimension has
+                # already been sliced away - it's not visible to
+                # the new keys.
+                result_keys.append(src_key)
+            elif isinstance(src_key, slice):
+                # A slice src_key means we have to apply the new key
+                # to the sliced version of the concrete dimension.
+                start, stop, stride = src_key.indices(src_size)
+                size = len(range(start, stop, stride))
+                new_key = new_keys.pop(0)
+                result_key = self._convert_key(new_key, size, start, stride)
+                result_keys.append(result_key)
+            else:
+                raise TypeError('invalid index: {!r}'.format(src_key))
+
+        # Now mop up any remaining src or new keys.
+        if src_keys:
+            # Any remaining src keys can just be appended.
+            # (They've already been sanity checked against the
+            # concrete array.)
+            result_keys.extend(src_keys)
+        else:
+            # Any remaining new keys need to be checked against
+            # the remaining dimension sizes of the concrete array.
+            for new_key, size in zip(new_keys, shape):
+                result_key = self._convert_key(new_key, size, 0, 1)
+                result_keys.append(result_key)
+
+        return ArrayAdapter(self._concrete, tuple(result_keys))
 
     def __repr__(self):
         return '<ArrayAdapter shape={} dtype={}>'.format(
@@ -136,9 +206,77 @@ class ArrayAdapter(Array):
         return array
 
 
+class ArrayStack(Array):
+    """
+    An Array made from a homogeneous array of other Arrays.
+
+    """
+    def __init__(self, stack):
+        first_array = stack.flat[0]
+        item_shape = first_array.shape
+        dtype = first_array.dtype
+        for array in stack.flat:
+            if array.shape != item_shape or array.dtype != dtype:
+                raise ValueError('invalid sub-array')
+        self._stack = stack
+        self._item_shape = item_shape
+        self._dtype = dtype
+
+    @property
+    def dtype(self):
+        return self._dtype
+
+    @property
+    def shape(self):
+        return self._stack.shape + self._item_shape
+
+    def __getitem__(self, keys):
+        if not isinstance(keys, tuple):
+            keys = (keys,)
+        if len(keys) > self.ndim:
+            raise IndexError('too many keys')
+        for key in keys:
+            if not(isinstance(key, int) or isinstance(key, slice)):
+                raise TypeError('invalid index: {!r}'.format(key))
+
+        stack_ndim = self._stack.ndim
+        stack_keys = keys[:stack_ndim]
+        item_keys = keys[stack_ndim:]
+
+        stack_shape = _sliced_shape(self._stack.shape, stack_keys)
+        if stack_shape:
+            stack = self._stack[stack_keys]
+            # If the result was 0D, convert it back to an array.
+            stack = numpy.array(stack)
+            for index in numpy.ndindex(stack_shape):
+                item = stack[index]
+                stack[index] = item[item_keys]
+            result = ArrayStack(stack)
+        else:
+            result = self._stack[stack_keys][item_keys]
+        return result
+
+    def __repr__(self):
+        return '<ArrayStack stack_shape={} item_shape={} dtype={}>'.format(
+            self._stack.shape, self._item_shape, self.dtype)
+
+    def __setitem__(self, keys, value):
+        assert len(keys) == self._stack.ndim
+        for key in keys:
+            assert isinstance(key, int)
+        assert isinstance(value, Array), type(value)
+        self._stack[keys] = value
+
+    def ndarray(self):
+        data = numpy.empty(self.shape, dtype=self.dtype)
+        for index in numpy.ndindex(self._stack.shape):
+            data[index] = self._stack[index].ndarray()
+        return data
+
+
 def mean(a, axis=None):
     """
-    Returns the mean of a BigArray as a NumPy ndarray.
+    Returns the mean of an Array as a NumPy ndarray.
 
     NB. Currently limited to axis=0.
 
