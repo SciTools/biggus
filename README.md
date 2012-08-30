@@ -1,6 +1,8 @@
 biggus
 ======
 
+[![Build Status](https://secure.travis-ci.org/SciTools/biggus.png)](http://travis-ci.org/SciTools/biggus)
+
 Virtual large arrays and lazy evaluation.
 
 
