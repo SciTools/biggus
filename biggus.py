@@ -1,4 +1,4 @@
-# (C) British Crown Copyright 2012, Met Office
+# (C) British Crown Copyright 2012 - 2013, Met Office
 #
 # This file is part of Biggus.
 #
@@ -46,6 +46,7 @@ Example:
 
 """
 from abc import ABCMeta, abstractproperty, abstractmethod
+import collections
 
 import numpy
 
@@ -90,21 +91,18 @@ class ArrayAdapter(Array):
     as an Array.
 
     """
-    def __init__(self, concrete, keys=None):
+    def __init__(self, concrete, keys=()):
         # concrete has:
         #   dtype
         #   ndim
         self._concrete = concrete
+        if not isinstance(keys, tuple):
+            keys = (keys,)
+        assert len(keys) <= concrete.ndim
         result_keys = []
-        if keys is not None:
-            if not isinstance(keys, tuple):
-                keys = (keys,)
-            assert len(keys) <= concrete.ndim
-            for key, size in zip(keys, concrete.shape):
-                result_key = self._convert_key(key, size, 0, 1)
-                result_keys.append(result_key)
-        # TODO: Check if we need self._keys set to None.
-        #   ... if not, remove all the `is None` checks.
+        for axis, (key, size) in enumerate(zip(keys, concrete.shape)):
+            result_key = self._cleanup_new_key(key, size, axis)
+            result_keys.append(key)
         self._keys = tuple(result_keys)
 
     @property
@@ -113,33 +111,68 @@ class ArrayAdapter(Array):
 
     @property
     def shape(self):
-        if self._keys is None:
-            shape = self._concrete.shape
-        else:
-            shape = _sliced_shape(self._concrete.shape, self._keys)
+        shape = _sliced_shape(self._concrete.shape, self._keys)
         return shape
 
-    def _convert_key(self, new_key, size, start, stride):
-        # Check if a key is valid for the given dimension size,
-        # and map it to the concrete array, accounting for the current
-        # start and stride in effect.
-        if isinstance(new_key, int):
-            # Is it a valid index?
-            if new_key < 0:
-                new_key += size
-            if new_key < 0 or new_key >= size:
-                raise IndexError('out of bounds')
-            # If so, map it back to the concrete array.
-            result_key = start + new_key * stride
-        elif isinstance(new_key, slice):
-            # Map the new slice back to the concrete array.
-            n_start, n_stop, n_stride = new_key.indices(size)
-            result_key = slice(start + stride * n_start,
-                               start + stride * n_stop,
-                               stride * n_stride)
-        else:
-            raise TypeError('invalid index: {!r}'.format(new_key))
+    def _cleanup_new_key(self, key, size, axis):
+        """
+        Return a key of type int, slice, or tuple that is guaranteed
+        to be valid for the given dimension size.
 
+        Raises IndexError/TypeError for invalid keys.
+
+        """
+        if isinstance(key, int):
+            if key >= size or key < -size:
+                msg = 'index {0} is out of bounds for axis {1} with' \
+                      ' size {2}'.format(key, axis, size)
+                raise IndexError(msg)
+        elif isinstance(key, slice):
+            pass
+        elif isinstance(key, collections.Iterable) and \
+                not isinstance(key, basestring):
+            # Make sure we capture the values in case we've
+            # been given a one-shot iterable, like a generator.
+            key = tuple(key)
+            for sub_key in key:
+                if sub_key >= size or sub_key < -size:
+                    msg = 'index {0} is out of bounds for axis {1}' \
+                          ' with size {2}'.format(sub_key, axis, size)
+                    raise IndexError(msg)
+        else:
+            raise TypeError('invalid key {!r}'.format(key))
+        return key
+
+    def _remap_new_key(self, indices, new_key, axis):
+        """
+        Return a key of type int, slice, or tuple that represents the
+        combination of new_key with the given indices.
+
+        Raises IndexError/TypeError for invalid keys.
+
+        """
+        size = len(indices)
+        if isinstance(new_key, int):
+            if new_key >= size or new_key < -size:
+                msg = 'index {0} is out of bounds for axis {1}' \
+                      ' with size {2}'.format(new_key, axis, size)
+                raise IndexError(msg)
+            result_key = indices[new_key]
+        elif isinstance(new_key, slice):
+            result_key = indices.__getitem__(new_key)
+        elif isinstance(new_key, collections.Iterable) and \
+                not isinstance(new_key, basestring):
+            # Make sure we capture the values in case we've
+            # been given a one-shot iterable, like a generator.
+            new_key = tuple(new_key)
+            for sub_key in new_key:
+                if sub_key >= size or sub_key < -size:
+                    msg = 'index {0} is out of bounds for axis {1}' \
+                          ' with size {2}'.format(sub_key, axis, size)
+                    raise IndexError(msg)
+            result_key = tuple(indices[key] for key in new_key)
+        else:
+            raise TypeError('invalid key {!r}'.format(new_key))
         return result_key
 
     def __getitem__(self, keys):
@@ -155,6 +188,7 @@ class ArrayAdapter(Array):
 
         # While we still have both existing and incoming keys to
         # deal with...
+        axis = 0
         while src_keys and new_keys:
             src_size = shape.pop(0)
             src_key = src_keys.pop(0)
@@ -162,17 +196,19 @@ class ArrayAdapter(Array):
                 # An integer src_key means this dimension has
                 # already been sliced away - it's not visible to
                 # the new keys.
-                result_keys.append(src_key)
+                result_key = src_key
             elif isinstance(src_key, slice):
                 # A slice src_key means we have to apply the new key
                 # to the sliced version of the concrete dimension.
                 start, stop, stride = src_key.indices(src_size)
-                size = len(range(start, stop, stride))
+                indices = tuple(range(start, stop, stride))
                 new_key = new_keys.pop(0)
-                result_key = self._convert_key(new_key, size, start, stride)
-                result_keys.append(result_key)
+                result_key = self._remap_new_key(indices, new_key, axis)
             else:
-                raise TypeError('invalid index: {!r}'.format(src_key))
+                new_key = new_keys.pop(0)
+                result_key = self._remap_new_key(src_key, new_key, axis)
+            result_keys.append(result_key)
+            axis += 1
 
         # Now mop up any remaining src or new keys.
         if src_keys:
@@ -184,8 +220,9 @@ class ArrayAdapter(Array):
             # Any remaining new keys need to be checked against
             # the remaining dimension sizes of the concrete array.
             for new_key, size in zip(new_keys, shape):
-                result_key = self._convert_key(new_key, size, 0, 1)
+                result_key = self._cleanup_new_key(new_key, size, axis)
                 result_keys.append(result_key)
+                axis += 1
 
         return ArrayAdapter(self._concrete, tuple(result_keys))
 
@@ -194,15 +231,12 @@ class ArrayAdapter(Array):
             self.shape, self.dtype)
 
     def ndarray(self):
-        if self._keys is None:
-            array = self._concrete[:]
-        else:
-            array = self._concrete.__getitem__(self._keys)
-            # We want the shape of the result to match the shape of the
-            # Array, so where we've ended up with an array-scalar,
-            # "inflate" it back to a 0-dimensional array.
-            if array.ndim == 0:
-                array = numpy.array(array)
+        array = self._concrete.__getitem__(self._keys)
+        # We want the shape of the result to match the shape of the
+        # Array, so where we've ended up with an array-scalar,
+        # "inflate" it back to a 0-dimensional array.
+        if array.ndim == 0:
+            array = numpy.array(array)
         return array
 
 
@@ -331,14 +365,14 @@ def _sliced_shape(shape, keys):
     """
     sliced_shape = []
     # TODO: Watch out for more keys than shape entries.
-    # TODO: Support some sort of "fancy" indexing?
-    #   e.g. The first tuple in: keys=((0, 5, 12, 14), 3, :, 2:3)
     for size, key in map(None, shape, keys):
         if isinstance(key, int):
             continue
         elif isinstance(key, slice):
             size = len(range(*key.indices(size)))
             sliced_shape.append(size)
+        elif isinstance(key, tuple):
+            sliced_shape.append(len(key))
         else:
             sliced_shape.append(size)
     sliced_shape = tuple(sliced_shape)

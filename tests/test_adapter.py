@@ -26,7 +26,7 @@ class TestAdapter(unittest.TestCase):
 
     def test_dtype(self):
         dtypes = ['f4', 'i1', 'O', 'm8', '<f4', '>f4', '=f4']
-        keys = [None, (), (5,), (slice(1, 3),)]
+        keys = [(), (5,), (slice(1, 3),)]
         for dtype in dtypes:
             for key in keys:
                 ndarray = numpy.zeros(10, dtype=dtype)
@@ -35,7 +35,7 @@ class TestAdapter(unittest.TestCase):
 
     def test_shape_0d(self):
         pairs = [
-            [None, ()],
+            [(), ()],
         ]
         for key, shape in pairs:
             ndarray = numpy.zeros(())
@@ -44,7 +44,6 @@ class TestAdapter(unittest.TestCase):
 
     def test_shape_1d(self):
         pairs = [
-            [None, (10,)],
             [(), (10,)],
             [(5,), ()],
             [(slice(1, 3),), (2,)],
@@ -56,7 +55,6 @@ class TestAdapter(unittest.TestCase):
 
     def test_shape_2d(self):
         pairs = [
-            [None, (30, 40)],
             [(), (30, 40)],
             [(5,), (40,)],
             [(slice(1, 3),), (2, 40)],
@@ -86,6 +84,8 @@ class TestAdapter(unittest.TestCase):
             [(30, 40), [(slice(None, None),), 4], (40,)],
             [(30, 40), [5, (slice(None, None),)], (40,)],
             [(30, 40), [(slice(None, 10),)], (10, 40)],
+            [(30, 40), [(slice(None, None),)], (30, 40)],
+            [(30, 40), [(slice(None, None, -2),)], (15, 40)],
             [(30, 40), [(slice(None, 10),), 5], (40,)],
             [(30, 40), [(slice(None, 10),), (slice(None, 3),)], (3, 40)],
             [(30, 40), [(slice(None, 10),), (slice(None, None, 2),)], (5, 40)],
@@ -112,10 +112,10 @@ class TestAdapter(unittest.TestCase):
 
     def test_ndarray(self):
         tests = [
-            [(3,), None, [0, 1, 2]],
+            [(3,), (), [0, 1, 2]],
             [(3,), (1,), [1]],
             [(3,), (slice(None, None, 2),), [0, 2]],
-            [(3, 4), None, [[0, 1, 2, 3], [4, 5, 6, 7], [8, 9, 10, 11]]],
+            [(3, 4), (), [[0, 1, 2, 3], [4, 5, 6, 7], [8, 9, 10, 11]]],
             [(3, 4), (1, ), [4, 5, 6, 7]],
             [(3, 4), (1, 3), 7],
         ]
