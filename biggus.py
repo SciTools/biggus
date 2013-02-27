@@ -47,6 +47,7 @@ Example:
 """
 from abc import ABCMeta, abstractproperty, abstractmethod
 import collections
+import itertools
 
 import numpy
 
@@ -305,6 +306,121 @@ class ArrayStack(Array):
         data = numpy.empty(self.shape, dtype=self.dtype)
         for index in numpy.ndindex(self._stack.shape):
             data[index] = self._stack[index].ndarray()
+        return data
+
+
+class LinearMosaic(Array):
+    def __init__(self, tiles, axis):
+        tiles = numpy.array(tiles, dtype='O', ndmin=1)
+        if tiles.ndim != 1:
+            raise ValueError('the tiles array must be 1-dimensional')
+        first = tiles[0]
+        if not(0 <= axis < first.ndim):
+            msg = 'invalid axis for {0}-dimensional tiles'.format(first.ndim)
+            raise ValueError(msg)
+        # Make sure all the tiles are compatible
+        common_shape = list(first.shape)
+        common_dtype = first.dtype
+        del common_shape[axis]
+        for tile in tiles[1:]:
+            shape = list(tile.shape)
+            del shape[axis]
+            if shape != common_shape:
+                raise ValueError('inconsistent tile shapes')
+            if tile.dtype != common_dtype:
+                raise ValueError('inconsistent tile dtypes')
+        self._tiles = tiles
+        self._axis = axis
+
+    @property
+    def dtype(self):
+        return self._tiles[0].dtype
+
+    @property
+    def shape(self):
+        shape = list(self._tiles[0].shape)
+        for tile in self._tiles[1:]:
+            shape[self._axis] += tile.shape[self._axis]
+        return tuple(shape)
+
+    def __getitem__(self, keys):
+        if not isinstance(keys, tuple):
+            keys = (keys,)
+        if len(keys) > self.ndim:
+            raise IndexError('too many keys')
+
+        axis = self._axis
+        if len(keys) <= axis:
+            # If there aren't enough keys to affect the tiling axis
+            # then it's safe to just pass the keys to each tile.
+            tile = self._tiles[0]
+            tiles = [tile[keys] for tile in self._tiles]
+            scalar_keys = filter(lambda key: isinstance(key, int), keys)
+            result = LinearMosaic(tiles, axis - len(scalar_keys))
+        else:
+            axis_lengths = [tile.shape[axis] for tile in self._tiles]
+            offsets = numpy.cumsum([0] + axis_lengths[:-1])
+            splits = offsets - 1
+            axis_key = keys[axis]
+            if isinstance(axis_key, int):
+                # Find the single relevant tile
+                tile_index = numpy.searchsorted(splits, axis_key) - 1
+                tile = self._tiles[tile_index]
+                tile_indices = list(keys)
+                tile_indices[axis] -= offsets[tile_index]
+                result = tile[tuple(tile_indices)]
+            elif isinstance(axis_key, (slice, collections.Iterable)) and \
+                    not isinstance(axis_key, basestring):
+                # Find the list of relevant tiles.
+                # NB. If the stride is large enough, this might not be a
+                # contiguous subset of self._tiles.
+                if isinstance(axis_key, slice):
+                    size = self.shape[axis]
+                    all_axis_indices = range(*axis_key.indices(size))
+                else:
+                    all_axis_indices = tuple(axis_key)
+                tile_indices = numpy.searchsorted(splits, all_axis_indices) - 1
+                pairs = itertools.izip(all_axis_indices, tile_indices)
+                i = itertools.groupby(pairs, lambda axis_tile: axis_tile[1])
+                tiles = []
+                tile_slice = list(keys)
+                for tile_index, group_of_pairs in i:
+                    axis_indices = zip(*group_of_pairs)[0]
+                    tile = self._tiles[tile_index]
+                    axis_indices = numpy.array(axis_indices)
+                    axis_indices -= offsets[tile_index]
+                    if len(axis_indices) == 1:
+                        # Even if we only need one value from this tile
+                        # we must preserve the axis dimension by using
+                        # a slice instead of a scalar.
+                        start = axis_indices[0]
+                        step = 1
+                        stop = start + 1
+                    else:
+                        start = axis_indices[0]
+                        step = axis_indices[1] - start
+                        stop = axis_indices[-1] + step
+                    tile_slice[axis] = slice(start, stop, step)
+                    tiles.append(tile[tuple(tile_slice)])
+                if isinstance(axis_key, slice) and \
+                        axis_key.step is not None and axis_key.step < 0:
+                    tiles.reverse()
+                result = LinearMosaic(tiles, axis)
+            else:
+                raise TypeError('invalid key {!r}'.format(axis_key))
+
+        return result
+
+    def ndarray(self):
+        data = numpy.empty(self.shape, dtype=self.dtype)
+        offset = 0
+        indices = [slice(None)] * self.ndim
+        axis = self._axis
+        for tile in self._tiles:
+            next_offset = offset + tile.shape[axis]
+            indices[axis] = slice(offset, next_offset)
+            data[indices] = tile.ndarray()
+            offset = next_offset
         return data
 
 
