@@ -228,7 +228,7 @@ class ArrayAdapter(Array):
         return ArrayAdapter(self._concrete, tuple(result_keys))
 
     def __repr__(self):
-        return '<ArrayAdapter shape={} dtype={}>'.format(
+        return '<ArrayAdapter shape={} dtype={!r}>'.format(
             self.shape, self.dtype)
 
     def ndarray(self):
@@ -292,7 +292,7 @@ class ArrayStack(Array):
         return result
 
     def __repr__(self):
-        return '<ArrayStack stack_shape={} item_shape={} dtype={}>'.format(
+        return '<ArrayStack stack_shape={} item_shape={} dtype={!r}>'.format(
             self._stack.shape, self._item_shape, self.dtype)
 
     def __setitem__(self, keys, value):
