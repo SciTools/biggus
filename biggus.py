@@ -85,6 +85,14 @@ class Array(object):
 
         """
 
+    @abstractmethod
+    def masked_array(self):
+        """
+        Returns the NumPy MaskedArray instance that corresponds to this
+        virtual array.
+
+        """
+
 
 class ArrayAdapter(Array):
     """
@@ -238,6 +246,17 @@ class ArrayAdapter(Array):
         # "inflate" it back to a 0-dimensional array.
         if array.ndim == 0:
             array = numpy.array(array)
+        if isinstance(array, numpy.ma.MaskedArray):
+            array = array.filled()
+        return array
+
+    def masked_array(self):
+        array = self._concrete.__getitem__(self._keys)
+        # We want the shape of the result to match the shape of the
+        # Array, so where we've ended up with an array-scalar,
+        # "inflate" it back to a 0-dimensional array.
+        if array.ndim == 0 or not isinstance(array, numpy.ma.MaskedArray):
+            array = numpy.ma.MaskedArray(array)
         return array
 
 
@@ -306,6 +325,14 @@ class ArrayStack(Array):
         data = numpy.empty(self.shape, dtype=self.dtype)
         for index in numpy.ndindex(self._stack.shape):
             data[index] = self._stack[index].ndarray()
+        return data
+
+    def masked_array(self):
+        data = numpy.ma.empty(self.shape, dtype=self.dtype)
+        for index in numpy.ndindex(self._stack.shape):
+            masked_array = self._stack[index].masked_array()
+            data[index] = masked_array
+            data.fill_value = masked_array.fill_value
         return data
 
 
@@ -420,6 +447,18 @@ class LinearMosaic(Array):
             next_offset = offset + tile.shape[axis]
             indices[axis] = slice(offset, next_offset)
             data[indices] = tile.ndarray()
+            offset = next_offset
+        return data
+
+    def masked_array(self):
+        data = numpy.ma.empty(self.shape, dtype=self.dtype)
+        offset = 0
+        indices = [slice(None)] * self.ndim
+        axis = self._axis
+        for tile in self._tiles:
+            next_offset = offset + tile.shape[axis]
+            indices[axis] = slice(offset, next_offset)
+            data[indices] = tile.masked_array()
             offset = next_offset
         return data
 
