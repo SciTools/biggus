@@ -27,6 +27,7 @@ class TestArray(unittest.TestCase):
         shape = property(lambda self: self._shape)
         __getitem__ = lambda self: None
         ndarray = lambda self: None
+        masked_array = lambda self: None
 
     def test_ndim(self):
         shape_ndims = [[(), 0], [(70, 300, 400), 3], [(6,), 1], [(5, 4), 2]]
