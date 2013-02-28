@@ -239,8 +239,48 @@ class ArrayAdapter(Array):
         return '<ArrayAdapter shape={} dtype={!r}>'.format(
             self.shape, self.dtype)
 
+    def _apply_keys(self):
+        # If we have more than one tuple as a key, then NumPy does
+        # "fancy" indexing, instead of "column-based" indexing, so we
+        # need to use multiple indexing operations to get the right
+        # result.
+        keys = self._keys
+        tuple_keys = [(i, key) for i, key in enumerate(keys)
+                                                if isinstance(key, tuple)]
+        if len(tuple_keys) > 1:
+            # Since we're potentially dealing with very large datasets
+            # we want to cut down the array as much as possible in the
+            # first iteration.
+            # But we can't reliably mix tuple keys with other tuple
+            # keys or with scalar keys. So the possible first cuts are:
+            #  - all scalars + all slices (iff there are any scalars)
+            #  - [tuple + all slices for tuple in tuples]
+            # Each possible cut will reduce the dataset to different
+            # size, and *ideally* we want to choose the smallest one.
+
+            # For now though ...
+            # ... use all the non-tuple keys first (if we have any) ...
+            dimensions = numpy.arange(len(keys))
+            if len(tuple_keys) != len(keys):
+                cut_keys = list(keys)
+                for i, key in tuple_keys:
+                    cut_keys[i] = slice(None)
+                array = self._concrete[tuple(cut_keys)]
+                is_scalar = [isinstance(key, int) for key in cut_keys]
+                dimensions -= numpy.cumsum(is_scalar)
+            else:
+                array = self._concrete
+            # ... and then do each tuple in turn.
+            for i, key in tuple_keys:
+                cut_keys = [slice(None)] * dimensions[i]
+                cut_keys.append(key)
+                array = array[tuple(cut_keys)]
+        else:
+            array = self._concrete.__getitem__(keys)
+        return array
+
     def ndarray(self):
-        array = self._concrete.__getitem__(self._keys)
+        array = self._apply_keys()
         # We want the shape of the result to match the shape of the
         # Array, so where we've ended up with an array-scalar,
         # "inflate" it back to a 0-dimensional array.
@@ -251,7 +291,7 @@ class ArrayAdapter(Array):
         return array
 
     def masked_array(self):
-        array = self._concrete.__getitem__(self._keys)
+        array = self._apply_keys()
         # We want the shape of the result to match the shape of the
         # Array, so where we've ended up with an array-scalar,
         # "inflate" it back to a 0-dimensional array.
@@ -287,10 +327,13 @@ class ArrayStack(Array):
     def __getitem__(self, keys):
         if not isinstance(keys, tuple):
             keys = (keys,)
+        # This weird check is safe against keys[-1] being an ndarray.
+        if isinstance(keys[-1], type(Ellipsis)):
+            keys = keys[:-1]
         if len(keys) > self.ndim:
             raise IndexError('too many keys')
         for key in keys:
-            if not(isinstance(key, int) or isinstance(key, slice)):
+            if not(isinstance(key, (int, slice, tuple, numpy.ndarray))):
                 raise TypeError('invalid index: {!r}'.format(key))
 
         stack_ndim = self._stack.ndim
@@ -526,7 +569,7 @@ def _sliced_shape(shape, keys):
         elif isinstance(key, slice):
             size = len(range(*key.indices(size)))
             sliced_shape.append(size)
-        elif isinstance(key, tuple):
+        elif isinstance(key, (tuple, numpy.ndarray)):
             sliced_shape.append(len(key))
         else:
             sliced_shape.append(size)

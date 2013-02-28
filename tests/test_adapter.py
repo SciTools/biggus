@@ -96,6 +96,11 @@ class TestAdapter(unittest.TestCase):
             [(30, 40), [3.5], TypeError],
             [(30, 40), ['foo'], TypeError],
             [(30, 40), [object()], TypeError],
+            # Fancy indexing
+            [(21, 5, 70, 30, 40), [((1, 5), 0, (2, 5, 10), slice(None, 15))],
+                (2, 3, 15, 40)],
+            [(21, 5, 2, 70, 30, 40), [(0, (1, 4), 1, (2, 5, 10),
+                                       slice(None, 15))], (2, 3, 15, 40)],
         ]
         for src_shape, cuts, target in tests:
             ndarray = numpy.zeros(src_shape)
@@ -108,7 +113,10 @@ class TestAdapter(unittest.TestCase):
                 for cut in cuts:
                     array = array.__getitem__(cut)
                     self.assertIsInstance(array, biggus.Array)
-                self.assertEqual(array.shape, target, '\nCuts: ' + `cuts`)
+                msg = '\nCuts: ' + `cuts`
+                self.assertEqual(array.shape, target, msg)
+                ndarray = array.ndarray()
+                self.assertEqual(ndarray.shape, target, msg)
 
     def test_ndarray(self):
         tests = [
