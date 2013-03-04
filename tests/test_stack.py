@@ -48,18 +48,18 @@ class TestStack(unittest.TestCase):
             [(6, 70), (30, 40), [5, (3, 2), 1], ()],
             [(6, 70), (30, 40), [(slice(None, None), 6)], (6, 30, 40)],
             [(6, 70), (30, 40), [(slice(None, None), slice(1, 5))],
-                (6, 4, 30, 40)],
+             (6, 4, 30, 40)],
             [(6, 70), (30, 40), [(slice(None, None),), 4], (70, 30, 40,)],
             [(6, 70), (30, 40), [5, (slice(None, None),)], (70, 30, 40,)],
             [(6, 70), (30, 40), [(slice(None, 10),)], (6, 70, 30, 40)],
             [(6, 70), (30, 40), [(slice(None, 10),), 5], (70, 30, 40,)],
             [(6, 70), (30, 40), [(slice(None, 10),), (slice(None, 3),)],
-                (3, 70, 30, 40)],
+             (3, 70, 30, 40)],
             [(6, 70), (30, 40), [(slice(None, 10),), (slice(None, None, 2),)],
-                (3, 70, 30, 40)],
+             (3, 70, 30, 40)],
             [(6, 70), (30, 40), [(slice(5, 10),),
                                  (slice(None, None), slice(2, 6))],
-                                (1, 4, 30, 40)],
+             (1, 4, 30, 40)],
             [(6, 70), (30, 40), [(slice(None, None), slice(2, 6)),
                                  (slice(5, 10),)], (1, 4, 30, 40)],
             [(6, 70), (30, 40), [3.5], TypeError],
@@ -84,7 +84,8 @@ class TestStack(unittest.TestCase):
                 for cut in cuts:
                     array = array.__getitem__(cut)
                     self.assertIsInstance(array, biggus.Array)
-                self.assertEqual(array.shape, target, '\nCuts: ' + `cuts`)
+                self.assertEqual(array.shape, target,
+                                 '\nCuts: {!r}'.format(cuts))
 
     def test_ndarray(self):
         # Sequence of tests, defined as:
