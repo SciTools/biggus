@@ -254,7 +254,7 @@ class ArrayAdapter(Array):
         # result.
         keys = self._keys
         tuple_keys = [(i, key) for i, key in enumerate(keys)
-                                                if isinstance(key, tuple)]
+                      if isinstance(key, tuple)]
         if len(tuple_keys) > 1:
             # Since we're potentially dealing with very large datasets
             # we want to cut down the array as much as possible in the
@@ -530,6 +530,7 @@ def mean(a, axis=None):
     chunk_size = 10
     condition = threading.Condition()
     chunks = []
+
     def read():
         for i in range(1, size, chunk_size):
             chunk = a[i:i + chunk_size].ndarray()
@@ -539,6 +540,7 @@ def mean(a, axis=None):
         with condition:
             chunks.append(None)
             condition.notify()
+
     producer = threading.Thread(target=read)
     producer.start()
 

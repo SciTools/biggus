@@ -113,7 +113,7 @@ class TestAdapter(unittest.TestCase):
                 for cut in cuts:
                     array = array.__getitem__(cut)
                     self.assertIsInstance(array, biggus.Array)
-                msg = '\nCuts: ' + `cuts`
+                msg = '\nCuts: {!r}'.format(cuts)
                 self.assertEqual(array.shape, target, msg)
                 ndarray = array.ndarray()
                 self.assertEqual(ndarray.shape, target, msg)
@@ -134,7 +134,8 @@ class TestAdapter(unittest.TestCase):
             result = array.ndarray()
             self.assertIsInstance(result, numpy.ndarray)
             self.assertEqual(array.dtype, result.dtype)
-            self.assertEqual(array.shape, result.shape, '\nKeys: ' + `src_keys`)
+            self.assertEqual(array.shape, result.shape,
+                             '\nKeys: {!r}'.format(src_keys))
             numpy.testing.assert_array_equal(result, target)
 
 
