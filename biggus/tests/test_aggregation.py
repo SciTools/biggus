@@ -50,30 +50,13 @@ class _AccessCounter(object):
         return set(np.unique(self.counts))
 
 
-class TestStd(unittest.TestCase):
-    def _compare(self, data, axis=0, ddof=0):
-        array = biggus.ArrayAdapter(data)
-        biggus_std = biggus.std(array, axis=axis, ddof=ddof)
-        np_std = np.std(data, axis=axis, ddof=ddof)
-        np.testing.assert_array_almost_equal(np_std,
-                                             biggus_std.ndarray())
-
-    def test_std_1d(self):
-        self._compare(np.arange(5, dtype='f4'))
-        self._compare(np.arange(5, dtype='f4'), ddof=1)
-
-    def test_std_2d(self):
-        data = np.arange(20, dtype='f4').reshape((4, 5))
-        self._compare(data)
-        self._compare(data.T)
-        self._compare(data, ddof=1)
-        self._compare(data.T, ddof=1)
-
-    def test_std(self):
+class TestAggregation(unittest.TestCase):
+    def _test_aggregation(self, biggus_op, numpy_op, **kwargs):
         # Sequence of tests, defined as:
         #   1. Original array shape.
         #   2. Sequence of indexing operations to apply.
         tests = [
+            [(10, ), []],
             [(30, 40), []],
             [(30, 40), [5]],
             [(500, 30, 40), [slice(3, 6)]],
@@ -86,37 +69,42 @@ class TestStd(unittest.TestCase):
             size = np.prod(shape)
             raw_data = np.linspace(0, 1, num=size).reshape(shape)
 
-            # "Compute" the biggus standard deviation
+            # Check the aggregation operation doesn't actually read any
+            # data.
             data = _AccessCounter(raw_data)
             array = biggus.ArrayAdapter(data)
-            biggus_std = biggus.std(array, axis=axis, ddof=ddof)
-
-            # Compute the NumPy standard deviation, and then wrap the
-            # result as an array so we can apply biggus-style indexing.
-            np_std_data = np.std(raw_data, axis=axis, ddof=ddof)
-            np_std_array = biggus.ArrayAdapter(np_std_data)
-
-            # Check the `std` operation doesn't actually read any data.
-            std_array = biggus.std(array, axis=0)
-            self.assertIsInstance(std_array, biggus.Array)
+            op_array = biggus_op(array, axis=0, **kwargs)
+            self.assertIsInstance(op_array, biggus.Array)
             self.assertTrue((data.counts == 0).all())
+
+            # Compute the NumPy aggregation, and then wrap the result as
+            # an array so we can apply biggus-style indexing.
+            numpy_op_data = numpy_op(raw_data, axis=axis, **kwargs)
+            numpy_op_array = biggus.ArrayAdapter(numpy_op_data)
 
             for keys in cuts:
                 # Check slicing doesn't actually read any data.
-                std_array = std_array[keys]
-                self.assertIsInstance(std_array, biggus.Array)
+                op_array = op_array[keys]
+                self.assertIsInstance(op_array, biggus.Array)
                 self.assertTrue((data.counts == 0).all())
                 # Update the NumPy result to match
-                np_std_array = np_std_array[keys]
+                numpy_op_array = numpy_op_array[keys]
 
-            # Check resolving `std_array` to a NumPy array only reads
+            # Check resolving `op_array` to a NumPy array only reads
             # each relevant source value once.
-            std = std_array.ndarray()
+            op_result = op_array.ndarray()
             self.assertTrue((data.counts <= 1).all())
 
             # Check the NumPy and biggus numeric values match.
-            np_std = np_std_array.ndarray()
-            np.testing.assert_array_almost_equal(std, np_std)
+            numpy_result = numpy_op_array.ndarray()
+            np.testing.assert_array_almost_equal(op_result, numpy_result)
+
+    def test_mean(self):
+        self._test_aggregation(biggus.mean, np.mean)
+
+    def test_std(self):
+        self._test_aggregation(biggus.std, np.std, ddof=0)
+        self._test_aggregation(biggus.std, np.std, ddof=1)
 
 
 if __name__ == '__main__':
