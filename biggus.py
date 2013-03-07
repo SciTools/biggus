@@ -25,10 +25,9 @@ Includes support for easily wrapping data sources which produce NumPy
 ndarray objects via slicing. For example: netcdf4python Variable
 instances, and NumPy ndarray instances.
 
-Operations which do not reduce the size of the array (e.g. element-wise
-arithmetic) are performed in a lazy fashion to avoid overloading system
-resources. Operations which reduce the size (e.g. taking the arithmetic
-mean) will return a NumPy ndarray.
+All operations are performed in a lazy fashion to avoid overloading
+system resources. Conversion to a concrete NumPy ndarray requires an
+explicit method call.
 
 Example:
     # Wrap two large data sources (e.g. 52000 x 800 x 600).
@@ -38,11 +37,16 @@ Example:
     # No actual calculations are performed here.
     error = predicted - measured
 
-    # Calculate the mean over the first dimension, and return a real
-    # NumPy ndarray. This is when the data is actually read,
-    # subtracted, and the mean derived, but all in a chunk-by-chunk
-    # fashion which avoids using much memory.
+    # *Appear* to calculate the mean over the first dimension, and
+    # return a new biggus Array with the correct shape, etc.
+    # NB. No data are read and no calculations are performed.
     mean_error = biggus.mean(error, axis=0)
+
+    # *Actually* calculate the mean, and return a NumPy ndarray.
+    # This is when the data are read, subtracted, and the mean derived,
+    # but all in a chunk-by-chunk fashion which avoids using much
+    # memory.
+    mean_error = mean_error.ndarray()
 
 """
 from abc import ABCMeta, abstractproperty, abstractmethod
@@ -538,8 +542,6 @@ def _process_chunks(a, chunk_handler):
     producer = threading.Thread(target=read)
     producer.start()
 
-    total = a[0].ndarray()
-    t = numpy.empty_like(total)
     while True:
         with condition:
             while not chunks and producer.is_alive():
@@ -550,7 +552,47 @@ def _process_chunks(a, chunk_handler):
         chunk_handler(chunk)
 
 
+class Aggregation(Array):
+    def __init__(self, operator, array, axis):
+        self._operator = operator
+        self._array = array
+        self._axis = axis
+
+    @property
+    def dtype(self):
+        return self._array.dtype
+
+    @property
+    def shape(self):
+        shape = list(self._array.shape)
+        del shape[self._axis]
+        return tuple(shape)
+
+    def __getitem__(self, keys):
+        assert self._axis == 0
+        if not isinstance(keys, tuple):
+            keys = (keys,)
+        keys = (slice(None),) + keys
+        return Aggregation(self._operator, self._array[keys], self._axis)
+
+    def ndarray(self):
+        return self._operator(self._array, axis=self._axis)
+
+    def masked_array(self):
+        raise RuntimeError()
+
+
 def mean(a, axis=None):
+    """
+    Returns the mean of an Array as another Array.
+
+    NB. Currently limited to axis=0.
+
+    """
+    return Aggregation(_mean, a, axis)
+
+
+def _mean(a, axis=None):
     """
     Returns the mean of an Array as a NumPy ndarray.
 
@@ -572,14 +614,26 @@ def mean(a, axis=None):
 
 def std(a, axis=None, ddof=0):
     """
+    Return the mean of an Array as another Array.
+
+    NB. Currently limited to axis=0.
+
+    """
+    def _operator(array, axis):
+        return _std(array, axis, ddof=ddof)
+    return Aggregation(_operator, a, axis)
+
+
+def _std(a, axis=None, ddof=0):
+    """
     Return the mean of an Array as a NumPy ndarray.
 
     NB. Currently limited to axis=0.
 
     """
+    # NB. This algorithm is not particularly good for numerical accuracy.
     assert axis == 0
     assert ddof in (0, 1)
-    size = a.shape[0]
     total = numpy.array(a[axis].ndarray())
     total_of_squares = numpy.asarray(total * total)
     t = numpy.empty_like(total)
@@ -594,6 +648,7 @@ def std(a, axis=None, ddof=0):
 
     _process_chunks(a, chunk_handler)
     # TODO: Optimise
+    size = numpy.array(a.shape[0], dtype=total.dtype)
     if ddof == 0:
         result = numpy.sqrt(size * total_of_squares - total * total) / size
     else:
