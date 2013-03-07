@@ -48,6 +48,7 @@ Example:
 from abc import ABCMeta, abstractproperty, abstractmethod
 import collections
 import itertools
+import threading
 
 import numpy
 
@@ -514,14 +515,7 @@ class LinearMosaic(Array):
         return data
 
 
-def mean(a, axis=None):
-    """
-    Returns the mean of an Array as a NumPy ndarray.
-
-    NB. Currently limited to axis=0.
-
-    """
-    assert axis == 0
+def _process_chunks(a, chunk_handler):
     #   chunk_size = 2      => 54s ~ 115% CPU
     #   chunk_size = 10     => 42s ~ 105% CPU (quicker than CDO!)
     #   chunk_size = 100    => 54s
@@ -553,9 +547,61 @@ def mean(a, axis=None):
             chunk = chunks.pop(0)
         if chunk is None:
             break
-        numpy.sum(chunk, axis=0, out=t)
-        total += t
+        chunk_handler(chunk)
+
+
+def mean(a, axis=None):
+    """
+    Returns the mean of an Array as a NumPy ndarray.
+
+    NB. Currently limited to axis=0.
+
+    """
+    assert axis == 0
+    size = a.shape[0]
+    total = a[axis].ndarray()
+    t = numpy.empty_like(total)
+
+    def chunk_handler(chunk):
+        numpy.sum(chunk, axis=axis, out=t)
+        numpy.add(total, t, out=total)
+
+    _process_chunks(a, chunk_handler)
     return numpy.divide(total, size, out=total)
+
+
+def std(a, axis=None, ddof=0):
+    """
+    Return the mean of an Array as a NumPy ndarray.
+
+    NB. Currently limited to axis=0.
+
+    """
+    assert axis == 0
+    assert ddof in (0, 1)
+    size = a.shape[0]
+    total = numpy.array(a[axis].ndarray())
+    total_of_squares = numpy.asarray(total * total)
+    t = numpy.empty_like(total)
+
+    def chunk_handler(chunk):
+        numpy.sum(chunk, axis=axis, out=t)
+        numpy.add(total, t, out=total)
+        # TODO: Might be faster to re-use a chunk-sized scratch array
+        # for computing the squares.
+        numpy.sum(chunk * chunk, axis=axis, out=t)
+        numpy.add(total_of_squares, t, out=total_of_squares)
+
+    _process_chunks(a, chunk_handler)
+    # TODO: Optimise
+    if ddof == 0:
+        result = numpy.sqrt(size * total_of_squares - total * total) / size
+    else:
+        result = numpy.sqrt((size * total_of_squares - total * total) /
+                            (size * (size - 1)))
+    if result.ndim == 0:
+        result = numpy.array(result)
+    return result
 
 
 # TODO: Test
