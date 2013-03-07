@@ -82,7 +82,6 @@ class TestStd(unittest.TestCase):
         axis = 0
         ddof = 0
         for shape, cuts in tests:
-            print shape, cuts
             # Define some test data
             size = numpy.prod(shape)
             raw_data = numpy.linspace(0, 1, num=size).reshape(shape)
