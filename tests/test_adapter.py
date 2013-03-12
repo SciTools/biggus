@@ -16,7 +16,7 @@
 # along with Biggus. If not, see <http://www.gnu.org/licenses/>.
 import unittest
 
-import numpy
+import numpy as np
 
 import biggus
 
@@ -29,16 +29,16 @@ class TestAdapter(unittest.TestCase):
         keys = [(), (5,), (slice(1, 3),)]
         for dtype in dtypes:
             for key in keys:
-                ndarray = numpy.zeros(10, dtype=dtype)
+                ndarray = np.zeros(10, dtype=dtype)
                 array = biggus.ArrayAdapter(ndarray, keys=key)
-                self.assertEqual(array.dtype, numpy.dtype(dtype))
+                self.assertEqual(array.dtype, np.dtype(dtype))
 
     def test_shape_0d(self):
         pairs = [
             [(), ()],
         ]
         for key, shape in pairs:
-            ndarray = numpy.zeros(())
+            ndarray = np.zeros(())
             array = biggus.ArrayAdapter(ndarray, keys=key)
             self.assertEqual(array.shape, shape)
 
@@ -49,7 +49,7 @@ class TestAdapter(unittest.TestCase):
             [(slice(1, 3),), (2,)],
         ]
         for key, shape in pairs:
-            ndarray = numpy.zeros(10)
+            ndarray = np.zeros(10)
             array = biggus.ArrayAdapter(ndarray, keys=key)
             self.assertEqual(array.shape, shape)
 
@@ -64,7 +64,7 @@ class TestAdapter(unittest.TestCase):
             [(slice(2, 3), slice(2, 6)), (1, 4)],
         ]
         for key, shape in pairs:
-            ndarray = numpy.zeros((30, 40))
+            ndarray = np.zeros((30, 40))
             array = biggus.ArrayAdapter(ndarray, keys=key)
             self.assertEqual(array.shape, shape)
 
@@ -103,7 +103,7 @@ class TestAdapter(unittest.TestCase):
                                        slice(None, 15))], (2, 3, 15, 40)],
         ]
         for src_shape, cuts, target in tests:
-            ndarray = numpy.zeros(src_shape)
+            ndarray = np.zeros(src_shape)
             array = biggus.ArrayAdapter(ndarray)
             if isinstance(target, type):
                 with self.assertRaises(target):
@@ -129,14 +129,14 @@ class TestAdapter(unittest.TestCase):
         ]
         for src_shape, src_keys, target in tests:
             size = reduce(lambda x, y: x * y, src_shape)
-            ndarray = numpy.arange(size).reshape(src_shape)
+            ndarray = np.arange(size).reshape(src_shape)
             array = biggus.ArrayAdapter(ndarray, keys=src_keys)
             result = array.ndarray()
-            self.assertIsInstance(result, numpy.ndarray)
+            self.assertIsInstance(result, np.ndarray)
             self.assertEqual(array.dtype, result.dtype)
             self.assertEqual(array.shape, result.shape,
                              '\nKeys: {!r}'.format(src_keys))
-            numpy.testing.assert_array_equal(result, target)
+            np.testing.assert_array_equal(result, target)
 
 
 if __name__ == '__main__':

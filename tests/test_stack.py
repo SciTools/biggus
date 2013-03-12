@@ -16,16 +16,16 @@
 # along with Biggus. If not, see <http://www.gnu.org/licenses/>.
 import unittest
 
-import numpy
+import numpy as np
 
 import biggus
 
 
 class TestStack(unittest.TestCase):
     def test_dtype(self):
-        dtype = numpy.dtype('f4')
-        item = biggus.ArrayAdapter(numpy.empty(6, dtype=dtype))
-        stack = numpy.array([item], dtype='O')
+        dtype = np.dtype('f4')
+        item = biggus.ArrayAdapter(np.empty(6, dtype=dtype))
+        stack = np.array([item], dtype='O')
         array = biggus.ArrayStack(stack)
         self.assertEqual(array.dtype, dtype)
 
@@ -66,14 +66,14 @@ class TestStack(unittest.TestCase):
             [(6, 70), (30, 40), ['foo'], TypeError],
             [(6, 70), (30, 40), [object()], TypeError],
         ]
-        dtype = numpy.dtype('f4')
+        dtype = np.dtype('f4')
         for stack_shape, item_shape, cuts, target in tests:
             def make_array(*n):
-                concrete = numpy.empty(item_shape, dtype)
+                concrete = np.empty(item_shape, dtype)
                 array = biggus.ArrayAdapter(concrete)
                 return array
-            stack = numpy.empty(stack_shape, dtype='O')
-            for index in numpy.ndindex(stack.shape):
+            stack = np.empty(stack_shape, dtype='O')
+            for index in np.ndindex(stack.shape):
                 stack[index] = make_array()
             array = biggus.ArrayStack(stack)
             if isinstance(target, type):
@@ -93,26 +93,26 @@ class TestStack(unittest.TestCase):
         #   2. item shape,
         #   3. expected result.
         tests = [
-            [(1,), (3,), numpy.arange(3).reshape(1, 3)],
-            [(1,), (3, 4), numpy.arange(12).reshape(1, 3, 4)],
-            [(6,), (3, 4), numpy.arange(72).reshape(6, 3, 4)],
-            [(6, 70), (3, 4), numpy.arange(5040).reshape(6, 70, 3, 4)],
+            [(1,), (3,), np.arange(3).reshape(1, 3)],
+            [(1,), (3, 4), np.arange(12).reshape(1, 3, 4)],
+            [(6,), (3, 4), np.arange(72).reshape(6, 3, 4)],
+            [(6, 70), (3, 4), np.arange(5040).reshape(6, 70, 3, 4)],
         ]
         for stack_shape, item_shape, target in tests:
-            stack = numpy.empty(stack_shape, dtype='O')
-            item_size = numpy.array(item_shape).prod()
-            for index in numpy.ndindex(stack.shape):
-                start = numpy.ravel_multi_index(index, stack_shape) * item_size
-                concrete = numpy.arange(item_size).reshape(item_shape)
+            stack = np.empty(stack_shape, dtype='O')
+            item_size = np.array(item_shape).prod()
+            for index in np.ndindex(stack.shape):
+                start = np.ravel_multi_index(index, stack_shape) * item_size
+                concrete = np.arange(item_size).reshape(item_shape)
                 concrete += start
                 array = biggus.ArrayAdapter(concrete)
                 stack[index] = array
             array = biggus.ArrayStack(stack)
             result = array.ndarray()
-            self.assertIsInstance(result, numpy.ndarray)
+            self.assertIsInstance(result, np.ndarray)
             self.assertEqual(array.dtype, result.dtype)
             self.assertEqual(array.shape, result.shape)
-            numpy.testing.assert_array_equal(result, target)
+            np.testing.assert_array_equal(result, target)
 
 
 if __name__ == '__main__':
