@@ -54,7 +54,8 @@ import collections
 import itertools
 import threading
 
-import numpy
+import numpy as np
+import numpy.ma as ma
 
 
 class Array(object):
@@ -132,8 +133,8 @@ class ArrayAdapter(Array):
         result = NotImplemented
         if isinstance(other, ArrayAdapter):
             result = self._concrete == other._concrete
-            if isinstance(result, numpy.ndarray):
-                result = numpy.all(result)
+            if isinstance(result, np.ndarray):
+                result = np.all(result)
         return result
 
     def _cleanup_new_key(self, key, size, axis):
@@ -273,14 +274,14 @@ class ArrayAdapter(Array):
 
             # For now though ...
             # ... use all the non-tuple keys first (if we have any) ...
-            dimensions = numpy.arange(len(keys))
+            dimensions = np.arange(len(keys))
             if len(tuple_keys) != len(keys):
                 cut_keys = list(keys)
                 for i, key in tuple_keys:
                     cut_keys[i] = slice(None)
                 array = self._concrete[tuple(cut_keys)]
                 is_scalar = [isinstance(key, int) for key in cut_keys]
-                dimensions -= numpy.cumsum(is_scalar)
+                dimensions -= np.cumsum(is_scalar)
             else:
                 array = self._concrete
             # ... and then do each tuple in turn.
@@ -298,8 +299,8 @@ class ArrayAdapter(Array):
         # Array, so where we've ended up with an array-scalar,
         # "inflate" it back to a 0-dimensional array.
         if array.ndim == 0:
-            array = numpy.array(array)
-        if isinstance(array, numpy.ma.MaskedArray):
+            array = np.array(array)
+        if ma.isMaskedArray(array):
             array = array.filled()
         return array
 
@@ -308,8 +309,8 @@ class ArrayAdapter(Array):
         # We want the shape of the result to match the shape of the
         # Array, so where we've ended up with an array-scalar,
         # "inflate" it back to a 0-dimensional array.
-        if array.ndim == 0 or not isinstance(array, numpy.ma.MaskedArray):
-            array = numpy.ma.MaskedArray(array)
+        if array.ndim == 0 or not ma.isMaskedArray(array):
+            array = ma.MaskedArray(array)
         return array
 
 
@@ -346,7 +347,7 @@ class ArrayStack(Array):
         if len(keys) > self.ndim:
             raise IndexError('too many keys')
         for key in keys:
-            if not(isinstance(key, (int, slice, tuple, numpy.ndarray))):
+            if not(isinstance(key, (int, slice, tuple, np.ndarray))):
                 raise TypeError('invalid index: {!r}'.format(key))
 
         stack_ndim = self._stack.ndim
@@ -357,8 +358,8 @@ class ArrayStack(Array):
         if stack_shape:
             stack = self._stack[stack_keys]
             # If the result was 0D, convert it back to an array.
-            stack = numpy.array(stack)
-            for index in numpy.ndindex(stack_shape):
+            stack = np.array(stack)
+            for index in np.ndindex(stack_shape):
                 item = stack[index]
                 stack[index] = item[item_keys]
             result = ArrayStack(stack)
@@ -378,14 +379,14 @@ class ArrayStack(Array):
         self._stack[keys] = value
 
     def ndarray(self):
-        data = numpy.empty(self.shape, dtype=self.dtype)
-        for index in numpy.ndindex(self._stack.shape):
+        data = np.empty(self.shape, dtype=self.dtype)
+        for index in np.ndindex(self._stack.shape):
             data[index] = self._stack[index].ndarray()
         return data
 
     def masked_array(self):
-        data = numpy.ma.empty(self.shape, dtype=self.dtype)
-        for index in numpy.ndindex(self._stack.shape):
+        data = ma.empty(self.shape, dtype=self.dtype)
+        for index in np.ndindex(self._stack.shape):
             masked_array = self._stack[index].masked_array()
             data[index] = masked_array
             data.fill_value = masked_array.fill_value
@@ -394,7 +395,7 @@ class ArrayStack(Array):
 
 class LinearMosaic(Array):
     def __init__(self, tiles, axis):
-        tiles = numpy.array(tiles, dtype='O', ndmin=1)
+        tiles = np.array(tiles, dtype='O', ndmin=1)
         if tiles.ndim != 1:
             raise ValueError('the tiles array must be 1-dimensional')
         first = tiles[0]
@@ -442,12 +443,12 @@ class LinearMosaic(Array):
             result = LinearMosaic(tiles, axis - len(scalar_keys))
         else:
             axis_lengths = [tile.shape[axis] for tile in self._tiles]
-            offsets = numpy.cumsum([0] + axis_lengths[:-1])
+            offsets = np.cumsum([0] + axis_lengths[:-1])
             splits = offsets - 1
             axis_key = keys[axis]
             if isinstance(axis_key, int):
                 # Find the single relevant tile
-                tile_index = numpy.searchsorted(splits, axis_key) - 1
+                tile_index = np.searchsorted(splits, axis_key) - 1
                 tile = self._tiles[tile_index]
                 tile_indices = list(keys)
                 tile_indices[axis] -= offsets[tile_index]
@@ -462,7 +463,7 @@ class LinearMosaic(Array):
                     all_axis_indices = range(*axis_key.indices(size))
                 else:
                     all_axis_indices = tuple(axis_key)
-                tile_indices = numpy.searchsorted(splits, all_axis_indices) - 1
+                tile_indices = np.searchsorted(splits, all_axis_indices) - 1
                 pairs = itertools.izip(all_axis_indices, tile_indices)
                 i = itertools.groupby(pairs, lambda axis_tile: axis_tile[1])
                 tiles = []
@@ -470,7 +471,7 @@ class LinearMosaic(Array):
                 for tile_index, group_of_pairs in i:
                     axis_indices = zip(*group_of_pairs)[0]
                     tile = self._tiles[tile_index]
-                    axis_indices = numpy.array(axis_indices)
+                    axis_indices = np.array(axis_indices)
                     axis_indices -= offsets[tile_index]
                     if len(axis_indices) == 1:
                         # Even if we only need one value from this tile
@@ -495,7 +496,7 @@ class LinearMosaic(Array):
         return result
 
     def ndarray(self):
-        data = numpy.empty(self.shape, dtype=self.dtype)
+        data = np.empty(self.shape, dtype=self.dtype)
         offset = 0
         indices = [slice(None)] * self.ndim
         axis = self._axis
@@ -507,7 +508,7 @@ class LinearMosaic(Array):
         return data
 
     def masked_array(self):
-        data = numpy.ma.empty(self.shape, dtype=self.dtype)
+        data = ma.empty(self.shape, dtype=self.dtype)
         offset = 0
         indices = [slice(None)] * self.ndim
         axis = self._axis
@@ -602,14 +603,14 @@ def _mean(a, axis=None):
     assert axis == 0
     size = a.shape[0]
     total = a[axis].ndarray()
-    t = numpy.empty_like(total)
+    t = np.empty_like(total)
 
     def chunk_handler(chunk):
-        numpy.sum(chunk, axis=axis, out=t)
-        numpy.add(total, t, out=total)
+        np.sum(chunk, axis=axis, out=t)
+        np.add(total, t, out=total)
 
     _process_chunks(a, chunk_handler)
-    return numpy.divide(total, size, out=total)
+    return np.divide(total, size, out=total)
 
 
 def std(a, axis=None, ddof=0):
@@ -634,28 +635,28 @@ def _std(a, axis=None, ddof=0):
     # NB. This algorithm is not particularly good for numerical accuracy.
     assert axis == 0
     assert ddof in (0, 1)
-    total = numpy.array(a[axis].ndarray())
-    total_of_squares = numpy.asarray(total * total)
-    t = numpy.empty_like(total)
+    total = np.array(a[axis].ndarray())
+    total_of_squares = np.asarray(total * total)
+    t = np.empty_like(total)
 
     def chunk_handler(chunk):
-        numpy.sum(chunk, axis=axis, out=t)
-        numpy.add(total, t, out=total)
+        np.sum(chunk, axis=axis, out=t)
+        np.add(total, t, out=total)
         # TODO: Might be faster to re-use a chunk-sized scratch array
         # for computing the squares.
-        numpy.sum(chunk * chunk, axis=axis, out=t)
-        numpy.add(total_of_squares, t, out=total_of_squares)
+        np.sum(chunk * chunk, axis=axis, out=t)
+        np.add(total_of_squares, t, out=total_of_squares)
 
     _process_chunks(a, chunk_handler)
     # TODO: Optimise
-    size = numpy.array(a.shape[0], dtype=total.dtype)
+    size = np.array(a.shape[0], dtype=total.dtype)
     if ddof == 0:
-        result = numpy.sqrt(size * total_of_squares - total * total) / size
+        result = np.sqrt(size * total_of_squares - total * total) / size
     else:
-        result = numpy.sqrt((size * total_of_squares - total * total) /
-                            (size * (size - 1)))
+        result = np.sqrt((size * total_of_squares - total * total) /
+                         (size * (size - 1)))
     if result.ndim == 0:
-        result = numpy.array(result)
+        result = np.array(result)
     return result
 
 
@@ -680,7 +681,7 @@ def _sliced_shape(shape, keys):
         elif isinstance(key, slice):
             size = len(range(*key.indices(size)))
             sliced_shape.append(size)
-        elif isinstance(key, (tuple, numpy.ndarray)):
+        elif isinstance(key, (tuple, np.ndarray)):
             sliced_shape.append(len(key))
         else:
             sliced_shape.append(size)

@@ -16,7 +16,7 @@
 # along with Biggus. If not, see <http://www.gnu.org/licenses/>.
 import unittest
 
-import numpy
+import numpy as np
 
 import biggus
 
@@ -29,7 +29,7 @@ class _AccessCounter(object):
     """
     def __init__(self, ndarray):
         self._ndarray = ndarray
-        self.counts = numpy.zeros(ndarray.shape)
+        self.counts = np.zeros(ndarray.shape)
 
     @property
     def ndim(self):
@@ -47,23 +47,23 @@ class _AccessCounter(object):
         return self._ndarray[keys]
 
     def unique_counts(self):
-        return set(numpy.unique(self.counts))
+        return set(np.unique(self.counts))
 
 
 class TestStd(unittest.TestCase):
     def _compare(self, data, axis=0, ddof=0):
         array = biggus.ArrayAdapter(data)
         biggus_std = biggus.std(array, axis=axis, ddof=ddof)
-        numpy_std = numpy.std(data, axis=axis, ddof=ddof)
-        numpy.testing.assert_array_almost_equal(numpy_std,
-                                                biggus_std.ndarray())
+        np_std = np.std(data, axis=axis, ddof=ddof)
+        np.testing.assert_array_almost_equal(np_std,
+                                             biggus_std.ndarray())
 
     def test_std_1d(self):
-        self._compare(numpy.arange(5, dtype='f4'))
-        self._compare(numpy.arange(5, dtype='f4'), ddof=1)
+        self._compare(np.arange(5, dtype='f4'))
+        self._compare(np.arange(5, dtype='f4'), ddof=1)
 
     def test_std_2d(self):
-        data = numpy.arange(20, dtype='f4').reshape((4, 5))
+        data = np.arange(20, dtype='f4').reshape((4, 5))
         self._compare(data)
         self._compare(data.T)
         self._compare(data, ddof=1)
@@ -83,8 +83,8 @@ class TestStd(unittest.TestCase):
         ddof = 0
         for shape, cuts in tests:
             # Define some test data
-            size = numpy.prod(shape)
-            raw_data = numpy.linspace(0, 1, num=size).reshape(shape)
+            size = np.prod(shape)
+            raw_data = np.linspace(0, 1, num=size).reshape(shape)
 
             # "Compute" the biggus standard deviation
             data = _AccessCounter(raw_data)
@@ -93,8 +93,8 @@ class TestStd(unittest.TestCase):
 
             # Compute the NumPy standard deviation, and then wrap the
             # result as an array so we can apply biggus-style indexing.
-            numpy_std_data = numpy.std(raw_data, axis=axis, ddof=ddof)
-            numpy_std_array = biggus.ArrayAdapter(numpy_std_data)
+            np_std_data = np.std(raw_data, axis=axis, ddof=ddof)
+            np_std_array = biggus.ArrayAdapter(np_std_data)
 
             # Check the `std` operation doesn't actually read any data.
             std_array = biggus.std(array, axis=0)
@@ -107,7 +107,7 @@ class TestStd(unittest.TestCase):
                 self.assertIsInstance(std_array, biggus.Array)
                 self.assertTrue((data.counts == 0).all())
                 # Update the NumPy result to match
-                numpy_std_array = numpy_std_array[keys]
+                np_std_array = np_std_array[keys]
 
             # Check resolving `std_array` to a NumPy array only reads
             # each relevant source value once.
@@ -115,8 +115,8 @@ class TestStd(unittest.TestCase):
             self.assertTrue((data.counts <= 1).all())
 
             # Check the NumPy and biggus numeric values match.
-            numpy_std = numpy_std_array.ndarray()
-            numpy.testing.assert_array_almost_equal(std, numpy_std)
+            np_std = np_std_array.ndarray()
+            np.testing.assert_array_almost_equal(std, np_std)
 
 
 if __name__ == '__main__':
