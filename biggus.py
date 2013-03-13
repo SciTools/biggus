@@ -129,14 +129,6 @@ class ArrayAdapter(Array):
         shape = _sliced_shape(self._concrete.shape, self._keys)
         return shape
 
-    def __eq__(self, other):
-        result = NotImplemented
-        if isinstance(other, ArrayAdapter):
-            result = self._concrete == other._concrete
-            if isinstance(result, np.ndarray):
-                result = np.all(result)
-        return result
-
     def _cleanup_new_key(self, key, size, axis):
         """
         Return a key of type int, slice, or tuple that is guaranteed
