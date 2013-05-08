@@ -58,6 +58,9 @@ import numpy as np
 import numpy.ma as ma
 
 
+__version__ = '0.1'
+
+
 class Array(object):
     """
     A virtual array which can be sliced to create smaller virtual
