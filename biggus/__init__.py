@@ -570,8 +570,7 @@ def ndarrays(arrays):
     ndarrays = [None] * len(arrays)
     aggregations_by_src = {}
     for i, array in enumerate(arrays):
-        if isinstance(array, _Aggregation) and \
-                isinstance(array._array, _ArrayAdapter):
+        if isinstance(array, _Aggregation):
             aggregations = aggregations_by_src.setdefault(array._array, [])
             aggregations.append((i, array))
         else:
@@ -751,7 +750,8 @@ class _Aggregation(Array):
                             self._chunk_handler_class, self._kwargs)
 
     def ndarray(self):
-        return ndarrays([self])[0]
+        result = ndarrays([self])[0]
+        return result
 
     def masked_array(self):
         raise RuntimeError()
@@ -778,6 +778,62 @@ def std(a, axis=None, ddof=0):
 
     """
     return _Aggregation(a, axis, _Std, {'ddof': ddof})
+
+
+class _Elementwise(Array):
+    def __init__(self, array1, array2, numpy_op, ma_op):
+        # TODO: Broadcasting
+        assert array1.shape == array2.shape
+        # TODO: Type-promotion
+        assert array1.dtype == array2.dtype
+        self._array1 = array1
+        self._array2 = array2
+        self._numpy_op = numpy_op
+        self._ma_op = ma_op
+
+    @property
+    def dtype(self):
+        return self._array1.dtype
+
+    @property
+    def shape(self):
+        return self._array1.shape
+
+    def __getitem__(self, keys):
+        if not isinstance(keys, tuple):
+            keys = (keys,)
+        return _Elementwise(self._array1[keys], self._array2[keys],
+                            self._numpy_op, self._ma_op)
+
+    def _calc(self, op):
+        operands = (self._array1, self._array2)
+        np_operands = ndarrays(operands)
+        result = op(*np_operands)
+        return result
+
+    def ndarray(self):
+        result = self._calc(self._numpy_op)
+        return result
+
+    def masked_array(self):
+        result = self._calc(self._ma_op)
+        return result
+
+
+def add(a, b):
+    """
+    Return the elementwise evaluation of `a + b` as another Array.
+
+    """
+    return _Elementwise(a, b, np.add, np.ma.add)
+
+
+def sub(a, b):
+    """
+    Return the elementwise evaluation of `a - b` as another Array.
+
+    """
+    return _Elementwise(a, b, np.subtract, np.ma.subtract)
 
 
 def _process_chunks(array, chunk_handler):
