@@ -515,19 +515,192 @@ class LinearMosaic(Array):
         return data
 
 
-def _process_chunks(a, chunk_handler):
+def ndarrays(arrays):
+    """
+    Return a list of NumPy ndarray objects corresponding to the given
+    biggus Array objects.
+
+    This can be more efficient (and hence faster) than converting the
+    individual arrays one by one.
+
+    """
+    # Pick out any _Aggregation nodes which have a simple ArrayAdapter
+    # source.
+    ndarrays = [None] * len(arrays)
+    aggregations_by_src = {}
+    for i, array in enumerate(arrays):
+        if isinstance(array, _Aggregation) and \
+                isinstance(array._array, ArrayAdapter):
+            aggregations = aggregations_by_src.setdefault(array._array, [])
+            aggregations.append((i, array))
+        else:
+            ndarrays[i] = array.ndarray()
+    for aggregations in aggregations_by_src.itervalues():
+        indexes = [agg[0] for agg in aggregations]
+        agg_arrays = [agg[1] for agg in aggregations]
+        agg_ndarrays = _aggregation_ndarrays(agg_arrays)
+        for i, ndarray in zip(indexes, agg_ndarrays):
+            ndarrays[i] = ndarray
+    return ndarrays
+
+
+def _aggregation_ndarrays(arrays):
+    chunk_handlers = [array.chunk_handler() for array in arrays]
+    for chunk_handler in chunk_handlers:
+        chunk_handler.bootstrap()
+
+    def meta_chunk_handler(chunk):
+        for chunk_handler in chunk_handlers:
+            chunk_handler.add_chunk(chunk)
+
+    src_array = arrays[0]._array
+    _process_chunks(src_array, meta_chunk_handler)
+
+    results = [chunk_handler.result() for chunk_handler in chunk_handlers]
+    return results
+
+
+class _ChunkHandler(object):
+    __metaclass__ = ABCMeta
+
+    def __init__(self, array, axis, kwargs):
+        self.array = array
+        self.axis = axis
+        self.kwargs = kwargs
+
+    @abstractmethod
+    def bootstrap(self):
+        pass
+
+    @abstractmethod
+    def add_chunk(self, chunk):
+        pass
+
+    @abstractmethod
+    def result(self):
+        pass
+
+
+class _Mean(_ChunkHandler):
+    def bootstrap(self):
+        first_slice = self.array[self.axis].ndarray()
+        self.running_total = np.array(first_slice)
+        self.t = np.empty_like(first_slice)
+
+    def add_chunk(self, chunk):
+        np.sum(chunk, axis=self.axis, out=self.t)
+        self.running_total += self.t
+
+    def result(self):
+        self.running_total /= self.array.shape[0]
+        return self.running_total
+
+
+class _Std(_ChunkHandler):
+    # The algorithm used here preserves numerical accuracy whilst only
+    # requiring a single pass, and is taken from:
+    # Welford, BP (August 1962). "Note on a Method for Calculating
+    # Corrected Sums of Squares and Products".
+    # Technometrics 4 (3): 419-420.
+    # http://zach.in.tu-clausthal.de/teaching/info_literatur/Welford.pdf
+
+    def bootstrap(self):
+        first_slice = self.array[self.axis].ndarray()
+        self.a = np.array(first_slice)
+        self.q = np.zeros_like(first_slice)
+        self.t = np.empty_like(first_slice)
+        self.k = 1
+
+    def add_chunk(self, chunk):
+        chunk = np.rollaxis(chunk, self.axis)
+        for slice in chunk:
+            self.k += 1
+
+            # Compute A(k)
+            np.subtract(slice, self.a, out=self.t)
+            self.t *= 1. / self.k
+            self.a += self.t
+
+            # Compute Q(k)
+            self.t *= self.t
+            self.t *= self.k * (self.k - 1)
+            self.q += self.t
+
+    def result(self):
+        assert self.k == self.array.shape[self.axis]
+        self.q /= (self.k - self.kwargs['ddof'])
+        result = np.sqrt(self.q)
+        return result
+
+
+class _Aggregation(Array):
+    def __init__(self, array, axis, chunk_handler_class, kwargs):
+        self._array = array
+        self._axis = axis
+        self._chunk_handler_class = chunk_handler_class
+        self._kwargs = kwargs
+
+    @property
+    def dtype(self):
+        return self._array.dtype
+
+    @property
+    def shape(self):
+        shape = list(self._array.shape)
+        del shape[self._axis]
+        return tuple(shape)
+
+    def __getitem__(self, keys):
+        assert self._axis == 0
+        if not isinstance(keys, tuple):
+            keys = (keys,)
+        keys = (slice(None),) + keys
+        return _Aggregation(self._array[keys], self._axis,
+                            self._chunk_handler_class, self._kwargs)
+
+    def ndarray(self):
+        return ndarrays([self])[0]
+
+    def masked_array(self):
+        raise RuntimeError()
+
+    def chunk_handler(self):
+        return self._chunk_handler_class(self._array, self._axis, self._kwargs)
+
+
+def mean(a, axis=None):
+    """
+    Returns the mean of an Array as another Array.
+
+    NB. Currently limited to axis=0.
+
+    """
+    return _Aggregation(a, axis, _Mean, {})
+
+
+def std(a, axis=None, ddof=0):
+    """
+    Return the mean of an Array as another Array.
+
+    NB. Currently limited to axis=0.
+
+    """
+    return _Aggregation(a, axis, _Std, {'ddof': ddof})
+
+
+def _process_chunks(array, chunk_handler):
     #   chunk_size = 2      => 54s ~ 115% CPU
     #   chunk_size = 10     => 42s ~ 105% CPU (quicker than CDO!)
     #   chunk_size = 100    => 54s
     #   chunk_size = 1000   => 63s
-    size = a.shape[0]
+    size = array.shape[0]
     chunk_size = 10
     condition = threading.Condition()
     chunks = []
 
     def read():
         for i in range(1, size, chunk_size):
-            chunk = a[i:i + chunk_size].ndarray()
+            chunk = array[i:i + chunk_size].ndarray()
             with condition:
                 chunks.append(chunk)
                 condition.notify()
@@ -545,114 +718,8 @@ def _process_chunks(a, chunk_handler):
             chunk = chunks.pop(0)
         if chunk is None:
             break
+        #chunk_handler.add_chunk(chunk)
         chunk_handler(chunk)
-
-
-class Aggregation(Array):
-    def __init__(self, operator, array, axis):
-        self._operator = operator
-        self._array = array
-        self._axis = axis
-
-    @property
-    def dtype(self):
-        return self._array.dtype
-
-    @property
-    def shape(self):
-        shape = list(self._array.shape)
-        del shape[self._axis]
-        return tuple(shape)
-
-    def __getitem__(self, keys):
-        assert self._axis == 0
-        if not isinstance(keys, tuple):
-            keys = (keys,)
-        keys = (slice(None),) + keys
-        return Aggregation(self._operator, self._array[keys], self._axis)
-
-    def ndarray(self):
-        return self._operator(self._array, axis=self._axis)
-
-    def masked_array(self):
-        raise RuntimeError()
-
-
-def mean(a, axis=None):
-    """
-    Returns the mean of an Array as another Array.
-
-    NB. Currently limited to axis=0.
-
-    """
-    return Aggregation(_mean, a, axis)
-
-
-def _mean(a, axis=None):
-    """
-    Returns the mean of an Array as a NumPy ndarray.
-
-    NB. Currently limited to axis=0.
-
-    """
-    assert axis == 0
-    size = a.shape[0]
-    total = a[axis].ndarray()
-    t = np.empty_like(total)
-
-    def chunk_handler(chunk):
-        np.sum(chunk, axis=axis, out=t)
-        np.add(total, t, out=total)
-
-    _process_chunks(a, chunk_handler)
-    return np.divide(total, size, out=total)
-
-
-def std(a, axis=None, ddof=0):
-    """
-    Return the mean of an Array as another Array.
-
-    NB. Currently limited to axis=0.
-
-    """
-    def _operator(array, axis):
-        return _std(array, axis, ddof=ddof)
-    return Aggregation(_operator, a, axis)
-
-
-def _std(a, axis=None, ddof=0):
-    """
-    Return the mean of an Array as a NumPy ndarray.
-
-    NB. Currently limited to axis=0.
-
-    """
-    # NB. This algorithm is not particularly good for numerical accuracy.
-    assert axis == 0
-    assert ddof in (0, 1)
-    total = np.array(a[axis].ndarray())
-    total_of_squares = np.asarray(total * total)
-    t = np.empty_like(total)
-
-    def chunk_handler(chunk):
-        np.sum(chunk, axis=axis, out=t)
-        np.add(total, t, out=total)
-        # TODO: Might be faster to re-use a chunk-sized scratch array
-        # for computing the squares.
-        np.sum(chunk * chunk, axis=axis, out=t)
-        np.add(total_of_squares, t, out=total_of_squares)
-
-    _process_chunks(a, chunk_handler)
-    # TODO: Optimise
-    size = np.array(a.shape[0], dtype=total.dtype)
-    if ddof == 0:
-        result = np.sqrt(size * total_of_squares - total * total) / size
-    else:
-        result = np.sqrt((size * total_of_squares - total * total) /
-                         (size * (size - 1)))
-    if result.ndim == 0:
-        result = np.array(result)
-    return result
 
 
 # TODO: Test
