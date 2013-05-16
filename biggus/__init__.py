@@ -53,6 +53,7 @@ from abc import ABCMeta, abstractproperty, abstractmethod
 import collections
 import itertools
 import threading
+import Queue
 
 import numpy as np
 import numpy.ma as ma
@@ -695,30 +696,21 @@ def _process_chunks(array, chunk_handler):
     #   chunk_size = 1000   => 63s
     size = array.shape[0]
     chunk_size = 10
-    condition = threading.Condition()
-    chunks = []
+    queue = Queue.Queue(maxsize=3)
 
     def read():
         for i in range(1, size, chunk_size):
             chunk = array[i:i + chunk_size].ndarray()
-            with condition:
-                chunks.append(chunk)
-                condition.notify()
-        with condition:
-            chunks.append(None)
-            condition.notify()
+            queue.put(chunk)
+        queue.put(None)
 
     producer = threading.Thread(target=read)
     producer.start()
 
     while True:
-        with condition:
-            while not chunks and producer.is_alive():
-                condition.wait(1)
-            chunk = chunks.pop(0)
+        chunk = queue.get()
         if chunk is None:
             break
-        #chunk_handler.add_chunk(chunk)
         chunk_handler(chunk)
 
 
