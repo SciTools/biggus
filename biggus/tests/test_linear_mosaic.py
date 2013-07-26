@@ -100,53 +100,51 @@ class TestLinearMosaic(unittest.TestCase):
 
     def test_getitem(self):
         tile3x4 = self._tile((3, 4))
-        if 0:
-            # NB. This is also testing ndarray(), so perhaps a different
-            # name would be more accurate.
-            mosaic = biggus.LinearMosaic(tile3x4, 0)
+        # NB. This is also testing ndarray(), so perhaps a different
+        # name would be more accurate.
+        mosaic = biggus.LinearMosaic(tile3x4, 0)
 
-            result = mosaic[1].ndarray()
-            target = [4, 5, 6, 7]
-            np.testing.assert_array_equal(result, target)
+        result = mosaic[1].ndarray()
+        target = [4, 5, 6, 7]
+        np.testing.assert_array_equal(result, target)
 
-            result = mosaic[:, 2].ndarray()
-            target = [2, 6, 10]
-            np.testing.assert_array_equal(result, target)
+        result = mosaic[:, 2].ndarray()
+        target = [2, 6, 10]
+        np.testing.assert_array_equal(result, target)
 
-            result = mosaic[2, 1].ndarray()
-            target = 9
-            np.testing.assert_array_equal(result, target)
+        result = mosaic[2, 1].ndarray()
+        target = 9
+        np.testing.assert_array_equal(result, target)
 
         mosaic = biggus.LinearMosaic([tile3x4, tile3x4], 1)
 
-        if 0:
-            result = mosaic[1].ndarray()
-            target = [4, 5, 6, 7, 4, 5, 6, 7]
-            np.testing.assert_array_equal(result, target)
+        result = mosaic[1].ndarray()
+        target = [4, 5, 6, 7, 4, 5, 6, 7]
+        np.testing.assert_array_equal(result, target)
 
-            result = mosaic[1:2].ndarray()
-            target = [[4, 5, 6, 7, 4, 5, 6, 7]]
-            np.testing.assert_array_equal(result, target)
+        result = mosaic[1:2].ndarray()
+        target = [[4, 5, 6, 7, 4, 5, 6, 7]]
+        np.testing.assert_array_equal(result, target)
 
-            result = mosaic[0:2].ndarray()
-            target = [[0, 1, 2, 3, 0, 1, 2, 3],
-                      [4, 5, 6, 7, 4, 5, 6, 7]]
-            np.testing.assert_array_equal(result, target)
+        result = mosaic[0:2].ndarray()
+        target = [[0, 1, 2, 3, 0, 1, 2, 3],
+                  [4, 5, 6, 7, 4, 5, 6, 7]]
+        np.testing.assert_array_equal(result, target)
 
-            result = mosaic[2:0:-1].ndarray()
-            target = [[8, 9, 10, 11, 8, 9, 10, 11],
-                      [4, 5, 6, 7, 4, 5, 6, 7]]
-            np.testing.assert_array_equal(result, target)
+        result = mosaic[2:0:-1].ndarray()
+        target = [[8, 9, 10, 11, 8, 9, 10, 11],
+                  [4, 5, 6, 7, 4, 5, 6, 7]]
+        np.testing.assert_array_equal(result, target)
 
-            result = mosaic[:, 5].ndarray()
-            target = [1, 5, 9]
-            np.testing.assert_array_equal(result, target)
+        result = mosaic[:, 5].ndarray()
+        target = [1, 5, 9]
+        np.testing.assert_array_equal(result, target)
 
-            result = mosaic[:, 1::3].ndarray()
-            target = [[1, 0, 3],
-                      [5, 4, 7],
-                      [9, 8, 11]]
-            np.testing.assert_array_equal(result, target)
+        result = mosaic[:, 1::3].ndarray()
+        target = [[1, 0, 3],
+                  [5, 4, 7],
+                  [9, 8, 11]]
+        np.testing.assert_array_equal(result, target)
 
         result = mosaic[::-2].ndarray()
         target = [[8, 9, 10, 11, 8, 9, 10, 11],
