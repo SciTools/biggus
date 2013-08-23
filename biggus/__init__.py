@@ -363,10 +363,6 @@ class ArrayStack(Array):
             result = self._stack[stack_keys][item_keys]
         return result
 
-    def __repr__(self):
-        return '<ArrayStack stack_shape={} item_shape={} dtype={!r}>'.format(
-            self._stack.shape, self._item_shape, self.dtype)
-
     def __setitem__(self, keys, value):
         assert len(keys) == self._stack.ndim
         for key in keys:
