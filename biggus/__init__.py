@@ -111,13 +111,13 @@ class ArrayAdapter(Array):
 
     """
     def __init__(self, concrete, keys=()):
-        # concrete has:
+        # concrete must have:
         #   dtype
-        #   ndim
+        #   shape
         self._concrete = concrete
         if not isinstance(keys, tuple):
             keys = (keys,)
-        assert len(keys) <= concrete.ndim
+        assert len(keys) <= len(concrete.shape)
         result_keys = []
         for axis, (key, size) in enumerate(zip(keys, concrete.shape)):
             result_key = self._cleanup_new_key(key, size, axis)
