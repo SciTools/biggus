@@ -138,6 +138,19 @@ class TestAdapter(unittest.TestCase):
                              '\nKeys: {!r}'.format(src_keys))
             np.testing.assert_array_equal(result, target)
 
+    def test_no_ndim(self):
+        # The concrete instance should not be need to provide `ndim` for
+        # the adapter to construct.
+        class Fake(object):
+            pass
+        ok = Fake()
+        ok.shape = (3, 4)
+        array = biggus.ArrayAdapter(ok)
+
+        no_shape = Fake()
+        with self.assertRaises(AttributeError):
+            array = biggus.ArrayAdapter(no_shape)
+
 
 if __name__ == '__main__':
     unittest.main()
