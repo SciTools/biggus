@@ -696,22 +696,23 @@ def _process_chunks(array, chunk_handler):
     #   chunk_size = 1000   => 63s
     size = array.shape[0]
     chunk_size = 10
-    queue = Queue.Queue(maxsize=3)
+    chunks = Queue.Queue(maxsize=3)
 
-    def read():
-        for i in range(1, size, chunk_size):
-            chunk = array[i:i + chunk_size].ndarray()
-            queue.put(chunk)
-        queue.put(None)
+    def worker():
+        while True:
+            chunk = chunks.get()
+            chunk_handler(chunk)
+            chunks.task_done()
 
-    producer = threading.Thread(target=read)
-    producer.start()
+    thread = threading.Thread(target=worker)
+    thread.daemon = True
+    thread.start()
 
-    while True:
-        chunk = queue.get()
-        if chunk is None:
-            break
-        chunk_handler(chunk)
+    for i in range(1, size, chunk_size):
+        chunk = array[i:i + chunk_size].ndarray()
+        chunks.put(chunk)
+
+    chunks.join()
 
 
 # TODO: Test
