@@ -70,6 +70,10 @@ class Array(object):
     """
     __metaclass__ = ABCMeta
 
+    def __repr__(self):
+        return '<{} shape={} dtype={!r}>'.format(type(self).__name__,
+                                                 self.shape, self.dtype)
+
     @property
     def ndim(self):
         """The number of dimensions in this virtual array."""
@@ -244,10 +248,6 @@ class ArrayAdapter(Array):
                 axis += 1
 
         return ArrayAdapter(self._concrete, tuple(result_keys))
-
-    def __repr__(self):
-        return '<ArrayAdapter shape={} dtype={!r}>'.format(
-            self.shape, self.dtype)
 
     def _apply_keys(self):
         # If we have more than one tuple as a key, then NumPy does
