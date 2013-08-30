@@ -557,6 +557,57 @@ def _aggregation_ndarrays(arrays):
     return results
 
 
+MAX_CHUNK_SIZE = 1024 * 1024
+
+
+def _all_slices(array):
+    # Return the slices for each dimension which ensure complete
+    # coverage by chunks no larger than MAX_CHUNK_SIZE.
+    # e.g. For a float32 array of shape (100, 768, 1024) the slices are:
+    #   (0, 1, 2, ..., 99),
+    #   (slice(0, 256), slice(256, 512), slice(512, 768)),
+    #   (slice(None)
+    nbytes = array.dtype.itemsize
+    all_slices = []
+    for i, size in reversed(list(enumerate(array.shape))):
+        if size * nbytes <= MAX_CHUNK_SIZE:
+            slices = (slice(None),)
+        elif nbytes > MAX_CHUNK_SIZE:
+            slices = range(size)
+        else:
+            step = MAX_CHUNK_SIZE / nbytes
+            slices = []
+            for start in range(0, size, step):
+                slices.append(slice(start, start + step))
+        nbytes *= size
+        all_slices.insert(0, slices)
+    return all_slices
+
+
+def save(sources, targets):
+    """
+    Save the numeric results of each source into its corresponding target.
+
+    """
+    # TODO: Remove restriction
+    assert len(sources) == 1 and len(targets) == 1
+    array = sources[0]
+    target = targets[0]
+
+    # Request bitesize pieces of the source and assign them to the
+    # target.
+    # NB. This algorithm does not use the minimal number of chunks.
+    #   e.g. If the second dimension could be sliced as 0:99, 99:100
+    #       then clearly the first dimension would have to be single
+    #       slices for the 0:99 case, but could be bigger slices for the
+    #       99:100 case.
+    # It's not yet clear if this really matters.
+    all_slices = _all_slices(array)
+    for index in np.ndindex(*[len(slices) for slices in all_slices]):
+        keys = tuple(slices[i] for slices, i in zip(all_slices, index))
+        target[keys] = array[keys].ndarray()
+
+
 class _ChunkHandler(object):
     __metaclass__ = ABCMeta
 
