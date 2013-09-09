@@ -106,8 +106,8 @@ class Array(object):
 
 class ArrayAdapter(Array):
     """
-    Exposes a "concrete" array (e.g. numpy.ndarray, netCDF4.Variable)
-    as an Array.
+    Exposes a pre-existing "concrete" array (e.g. numpy.ndarray,
+    netCDF4.Variable) as a :class:`biggus.Array`.
 
     """
     def __init__(self, concrete, keys=()):
@@ -411,6 +411,7 @@ class LinearMosaic(Array):
                 raise ValueError('inconsistent tile dtypes')
         self._tiles = tiles
         self._axis = axis
+        self._cached_shape = None
 
     @property
     def dtype(self):
@@ -418,10 +419,12 @@ class LinearMosaic(Array):
 
     @property
     def shape(self):
-        shape = list(self._tiles[0].shape)
-        for tile in self._tiles[1:]:
-            shape[self._axis] += tile.shape[self._axis]
-        return tuple(shape)
+        if self._cached_shape is None:
+            shape = list(self._tiles[0].shape)
+            for tile in self._tiles[1:]:
+                shape[self._axis] += tile.shape[self._axis]
+            self._cached_shape = tuple(shape)
+        return self._cached_shape
 
     def __getitem__(self, keys):
         if not isinstance(keys, tuple):
