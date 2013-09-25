@@ -31,8 +31,8 @@ explicit method call.
 
 Example:
     # Wrap two large data sources (e.g. 52000 x 800 x 600).
-    measured = ArrayAdapter(netcdf_var_a)
-    predicted = ArrayAdapter(netcdf_var_b)
+    measured = OrthoArrayAdapter(netcdf_var_a)
+    predicted = OrthoArrayAdapter(netcdf_var_b)
 
     # No actual calculations are performed here.
     error = predicted - measured
@@ -108,10 +108,10 @@ class Array(object):
         """
 
 
-class ArrayAdapter(Array):
+class _ArrayAdapter(Array):
     """
-    Exposes a pre-existing "concrete" array (e.g. numpy.ndarray,
-    netCDF4.Variable) as a :class:`biggus.Array`.
+    Abstract base class for exposing a "concrete" data source as a
+    :class:`biggus.Array`.
 
     """
     def __init__(self, concrete, keys=()):
@@ -247,8 +247,44 @@ class ArrayAdapter(Array):
                 result_keys.append(result_key)
                 axis += 1
 
-        return ArrayAdapter(self._concrete, tuple(result_keys))
+        return type(self)(self._concrete, tuple(result_keys))
 
+    @abstractmethod
+    def _apply_keys(self):
+        pass
+
+    def ndarray(self):
+        array = self._apply_keys()
+        # We want the shape of the result to match the shape of the
+        # Array, so where we've ended up with an array-scalar,
+        # "inflate" it back to a 0-dimensional array.
+        if array.ndim == 0:
+            array = np.array(array)
+        if ma.isMaskedArray(array):
+            array = array.filled()
+        return array
+
+    def masked_array(self):
+        array = self._apply_keys()
+        # We want the shape of the result to match the shape of the
+        # Array, so where we've ended up with an array-scalar,
+        # "inflate" it back to a 0-dimensional array.
+        if array.ndim == 0 or not ma.isMaskedArray(array):
+            array = ma.MaskedArray(array)
+        return array
+
+
+class NumpyArrayAdapter(_ArrayAdapter):
+    """
+    Exposes a "concrete" data source which supports NumPy "fancy
+    indexing" as a :class:`biggus.Array`.
+
+    A NumPy ndarray instance is an example suitable data source.
+
+    NB. NumPy "fancy indexing" contrasts with orthogonal indexing which
+    treats multiple iterable index keys as independent.
+
+    """
     def _apply_keys(self):
         # If we have more than one tuple as a key, then NumPy does
         # "fancy" indexing, instead of "column-based" indexing, so we
@@ -289,24 +325,31 @@ class ArrayAdapter(Array):
             array = self._concrete.__getitem__(keys)
         return array
 
-    def ndarray(self):
-        array = self._apply_keys()
-        # We want the shape of the result to match the shape of the
-        # Array, so where we've ended up with an array-scalar,
-        # "inflate" it back to a 0-dimensional array.
-        if array.ndim == 0:
-            array = np.array(array)
-        if ma.isMaskedArray(array):
-            array = array.filled()
-        return array
 
-    def masked_array(self):
-        array = self._apply_keys()
-        # We want the shape of the result to match the shape of the
-        # Array, so where we've ended up with an array-scalar,
-        # "inflate" it back to a 0-dimensional array.
-        if array.ndim == 0 or not ma.isMaskedArray(array):
-            array = ma.MaskedArray(array)
+class OrthoArrayAdapter(_ArrayAdapter):
+    """
+    Exposes a "concrete" data source which supports orthogonal indexing
+    as a :class:`biggus.Array`.
+
+    Orthogonal indexing treats multiple iterable index keys as
+    independent (which is also the behaviour of a :class:`biggus.Array`).
+
+    For example::
+
+        >>> ortho_concrete.shape
+        (100, 200, 300)
+        >> ortho_concrete[(0, 3, 4), :, (1, 9)].shape
+        (3, 200, 2)
+
+    A netCDF4.Variable instance is an example orthogonal concrete array.
+
+    NB. Orthogonal indexing contrasts with NumPy "fancy indexing" where
+    multiple iterable index keys are zipped together to allow the
+    selection of sparse locations.
+
+    """
+    def _apply_keys(self):
+        array = self._concrete.__getitem__(self._keys)
         return array
 
 
@@ -524,13 +567,13 @@ def ndarrays(arrays):
     individual arrays one by one.
 
     """
-    # Pick out any _Aggregation nodes which have a simple ArrayAdapter
+    # Pick out any _Aggregation nodes which have a simple _ArrayAdapter
     # source.
     ndarrays = [None] * len(arrays)
     aggregations_by_src = {}
     for i, array in enumerate(arrays):
         if isinstance(array, _Aggregation) and \
-                isinstance(array._array, ArrayAdapter):
+                isinstance(array._array, _ArrayAdapter):
             aggregations = aggregations_by_src.setdefault(array._array, [])
             aggregations.append((i, array))
         else:

@@ -21,7 +21,7 @@ import numpy as np
 import biggus
 
 
-class TestAdapter(unittest.TestCase):
+class _TestAdapter(unittest.TestCase):
     longMessage = True
 
     def test_dtype(self):
@@ -29,8 +29,7 @@ class TestAdapter(unittest.TestCase):
         keys = [(), (5,), (slice(1, 3),)]
         for dtype in dtypes:
             for key in keys:
-                ndarray = np.zeros(10, dtype=dtype)
-                array = biggus.ArrayAdapter(ndarray, keys=key)
+                array = self.zeros_adapter([10], dtype=dtype, keys=key)
                 self.assertEqual(array.dtype, np.dtype(dtype))
 
     def test_shape_0d(self):
@@ -38,8 +37,7 @@ class TestAdapter(unittest.TestCase):
             [(), ()],
         ]
         for key, shape in pairs:
-            ndarray = np.zeros(())
-            array = biggus.ArrayAdapter(ndarray, keys=key)
+            array = self.zeros_adapter((), keys=key)
             self.assertEqual(array.shape, shape)
 
     def test_shape_1d(self):
@@ -49,8 +47,7 @@ class TestAdapter(unittest.TestCase):
             [(slice(1, 3),), (2,)],
         ]
         for key, shape in pairs:
-            ndarray = np.zeros(10)
-            array = biggus.ArrayAdapter(ndarray, keys=key)
+            array = self.zeros_adapter([10], keys=key)
             self.assertEqual(array.shape, shape)
 
     def test_shape_2d(self):
@@ -64,8 +61,7 @@ class TestAdapter(unittest.TestCase):
             [(slice(2, 3), slice(2, 6)), (1, 4)],
         ]
         for key, shape in pairs:
-            ndarray = np.zeros((30, 40))
-            array = biggus.ArrayAdapter(ndarray, keys=key)
+            array = self.zeros_adapter((30, 40), keys=key)
             self.assertEqual(array.shape, shape)
 
     def test_getitem(self):
@@ -103,8 +99,7 @@ class TestAdapter(unittest.TestCase):
                                        slice(None, 15))], (2, 3, 15, 40)],
         ]
         for src_shape, cuts, target in tests:
-            ndarray = np.zeros(src_shape)
-            array = biggus.ArrayAdapter(ndarray)
+            array = self.zeros_adapter(src_shape)
             if isinstance(target, type):
                 with self.assertRaises(target):
                     for cut in cuts:
@@ -128,9 +123,7 @@ class TestAdapter(unittest.TestCase):
             [(3, 4), (1, 3), 7],
         ]
         for src_shape, src_keys, target in tests:
-            size = reduce(lambda x, y: x * y, src_shape)
-            ndarray = np.arange(size).reshape(src_shape)
-            array = biggus.ArrayAdapter(ndarray, keys=src_keys)
+            array = self.arange_adapter(src_shape, keys=src_keys)
             result = array.ndarray()
             self.assertIsInstance(result, np.ndarray)
             self.assertEqual(array.dtype, result.dtype)
@@ -145,11 +138,46 @@ class TestAdapter(unittest.TestCase):
             pass
         ok = Fake()
         ok.shape = (3, 4)
-        array = biggus.ArrayAdapter(ok)
+        ok.dtype = 'f'
+        array = self.wrap(ok, ())
 
-        no_shape = Fake()
+        no_shape_dtype = Fake()
         with self.assertRaises(AttributeError):
-            array = biggus.ArrayAdapter(no_shape)
+            array = self.wrap(no_shape_dtype, ())
+
+    def zeros_adapter(self, shape, dtype='f', keys=()):
+        ndarray = np.zeros(shape, dtype=dtype)
+        return self.wrap(ndarray, keys)
+
+    def arange_adapter(self, shape, keys):
+        size = reduce(lambda x, y: x * y, shape)
+        ndarray = np.arange(size).reshape(shape)
+        return self.wrap(ndarray, keys)
+
+
+class TestNumpyAdapter(_TestAdapter):
+    def wrap(self, ndarray, keys):
+        return biggus.NumpyArrayAdapter(ndarray, keys)
+
+
+class TestOrthoAdapter(_TestAdapter):
+    class Ortho(object):
+        def __init__(self, array):
+            self._array = array
+            self.shape = array.shape
+            self.dtype = array.dtype
+
+        def __getitem__(self, keys):
+            result = self._array
+            for i, key in reversed(list(enumerate(keys))):
+                index = [slice(None)] * i + [key]
+                result = result.__getitem__(tuple(index))
+            return result
+
+    def wrap(self, ndarray, keys):
+        ortho = TestOrthoAdapter.Ortho(ndarray)
+        array = biggus.OrthoArrayAdapter(ortho, keys)
+        return array
 
 
 if __name__ == '__main__':

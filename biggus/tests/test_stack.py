@@ -24,7 +24,7 @@ import biggus
 class TestStack(unittest.TestCase):
     def test_dtype(self):
         dtype = np.dtype('f4')
-        item = biggus.ArrayAdapter(np.empty(6, dtype=dtype))
+        item = biggus.NumpyArrayAdapter(np.empty(6, dtype=dtype))
         stack = np.array([item], dtype='O')
         array = biggus.ArrayStack(stack)
         self.assertEqual(array.dtype, dtype)
@@ -70,7 +70,7 @@ class TestStack(unittest.TestCase):
         for stack_shape, item_shape, cuts, target in tests:
             def make_array(*n):
                 concrete = np.empty(item_shape, dtype)
-                array = biggus.ArrayAdapter(concrete)
+                array = biggus.NumpyArrayAdapter(concrete)
                 return array
             stack = np.empty(stack_shape, dtype='O')
             for index in np.ndindex(stack.shape):
@@ -105,7 +105,7 @@ class TestStack(unittest.TestCase):
                 start = np.ravel_multi_index(index, stack_shape) * item_size
                 concrete = np.arange(item_size).reshape(item_shape)
                 concrete += start
-                array = biggus.ArrayAdapter(concrete)
+                array = biggus.NumpyArrayAdapter(concrete)
                 stack[index] = array
             array = biggus.ArrayStack(stack)
             result = array.ndarray()

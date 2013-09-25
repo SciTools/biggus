@@ -72,7 +72,7 @@ class TestAggregation(unittest.TestCase):
             # Check the aggregation operation doesn't actually read any
             # data.
             data = _AccessCounter(raw_data)
-            array = biggus.ArrayAdapter(data)
+            array = biggus.NumpyArrayAdapter(data)
             op_array = biggus_op(array, axis=0, **kwargs)
             self.assertIsInstance(op_array, biggus.Array)
             self.assertTrue((data.counts == 0).all())
@@ -80,7 +80,7 @@ class TestAggregation(unittest.TestCase):
             # Compute the NumPy aggregation, and then wrap the result as
             # an array so we can apply biggus-style indexing.
             numpy_op_data = numpy_op(raw_data, axis=axis, **kwargs)
-            numpy_op_array = biggus.ArrayAdapter(numpy_op_data)
+            numpy_op_array = biggus.NumpyArrayAdapter(numpy_op_data)
 
             for keys in cuts:
                 # Check slicing doesn't actually read any data.
