@@ -318,9 +318,7 @@ class NumpyArrayAdapter(_ArrayAdapter):
                 array = self._concrete
             # ... and then do each tuple in turn.
             for i, key in tuple_keys:
-                cut_keys = [slice(None)] * dimensions[i]
-                cut_keys.append(key)
-                array = array[tuple(cut_keys)]
+                array = np.take(array, key, axis=dimensions[i])
         else:
             array = self._concrete.__getitem__(keys)
         return array
