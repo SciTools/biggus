@@ -57,7 +57,7 @@ class TestNdarray(unittest.TestCase):
         size = numpy.prod(shape)
         raw_data = numpy.linspace(0, 1, num=size).reshape(shape)
         data = _AccessCounter(raw_data)
-        array = biggus.ArrayAdapter(data)
+        array = biggus.NumpyArrayAdapter(data)
         mean_array = biggus.mean(array, axis=0)
         std_array = biggus.std(array, axis=0)
         self.assertIsInstance(mean_array, biggus.Array)

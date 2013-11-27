@@ -24,7 +24,7 @@ import biggus
 class TestLinearMosaic(unittest.TestCase):
     def _tile(self, shape, dtype='f4'):
         data = np.arange(np.product(shape), dtype=dtype).reshape(shape)
-        return biggus.ArrayAdapter(data)
+        return biggus.NumpyArrayAdapter(data)
 
     def test_init(self):
         # Simple

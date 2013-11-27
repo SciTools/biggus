@@ -52,7 +52,7 @@ class TestWritePattern(unittest.TestCase):
     def _small_array(self):
         shape = (768, 1024)
         data = np.arange(np.prod(shape), dtype=np.float32).reshape(shape)
-        array = biggus.ArrayAdapter(data)
+        array = biggus.NumpyArrayAdapter(data)
         return array
 
     def test_small(self):
@@ -75,7 +75,7 @@ class TestNumbers(unittest.TestCase):
     # Check the numeric results of the save operation.
     def test_numbers(self):
         data = np.arange(12, dtype=np.float32).reshape(3, 4) + 10
-        array = biggus.ArrayAdapter(data)
+        array = biggus.NumpyArrayAdapter(data)
         target = np.zeros((3, 4))
         biggus.save([array], [target])
         np.testing.assert_array_equal(data, target)
