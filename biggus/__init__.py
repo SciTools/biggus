@@ -70,6 +70,18 @@ class Array(object):
     """
     __metaclass__ = ABCMeta
 
+    @staticmethod
+    def ndarrays(arrays):
+        """
+        Return a list of NumPy ndarray objects corresponding to the given
+        biggus Array objects.
+
+        Subclasses may override this method to provide more efficient
+        implementations for their instances.
+
+        """
+        return [array.ndarray() for array in arrays]
+
     def __repr__(self):
         return '<{} shape={} dtype={!r}>'.format(type(self).__name__,
                                                  self.shape, self.dtype)
@@ -565,39 +577,20 @@ def ndarrays(arrays):
     individual arrays one by one.
 
     """
-    # Pick out any _Aggregation nodes which have a simple _ArrayAdapter
-    # source.
-    ndarrays = [None] * len(arrays)
-    aggregations_by_src = {}
+    # Group the given Arrays by their static ndarrays() methods.
+    index_array_pairs_by_func = {}
     for i, array in enumerate(arrays):
-        if isinstance(array, _Aggregation):
-            aggregations = aggregations_by_src.setdefault(array._array, [])
-            aggregations.append((i, array))
-        else:
-            ndarrays[i] = array.ndarray()
-    for aggregations in aggregations_by_src.itervalues():
-        indexes = [agg[0] for agg in aggregations]
-        agg_arrays = [agg[1] for agg in aggregations]
-        agg_ndarrays = _aggregation_ndarrays(agg_arrays)
-        for i, ndarray in zip(indexes, agg_ndarrays):
-            ndarrays[i] = ndarray
-    return ndarrays
-
-
-def _aggregation_ndarrays(arrays):
-    chunk_handlers = [array.chunk_handler() for array in arrays]
-    for chunk_handler in chunk_handlers:
-        chunk_handler.bootstrap()
-
-    def meta_chunk_handler(chunk):
-        for chunk_handler in chunk_handlers:
-            chunk_handler.add_chunk(chunk)
-
-    src_array = arrays[0]._array
-    _process_chunks(src_array, meta_chunk_handler)
-
-    results = [chunk_handler.result() for chunk_handler in chunk_handlers]
-    return results
+        index_array_pairs = index_array_pairs_by_func.setdefault(
+            array.ndarrays, [])
+        index_array_pairs.append((i, array))
+    # Call each static ndarrays() method and compile the results.
+    all_results = [None] * len(arrays)
+    for func, index_array_pairs in index_array_pairs_by_func.iteritems():
+        indices = [index for index, array in index_array_pairs]
+        results = func([array for index, array in index_array_pairs])
+        for i, ndarray in zip(indices, results):
+            all_results[i] = ndarray
+    return all_results
 
 
 MAX_CHUNK_SIZE = 1024 * 1024
@@ -725,6 +718,46 @@ class _Std(_ChunkHandler):
 
 
 class _Aggregation(Array):
+    @staticmethod
+    def ndarrays(arrays):
+        """
+        Return a list of NumPy ndarray objects corresponding to the given
+        biggus _Aggregation objects.
+
+        """
+        assert all(isinstance(array, _Aggregation) for array in arrays)
+
+        # Group the given Arrays by their sources.
+        index_array_pairs_by_source = {}
+        for i, array in enumerate(arrays):
+            index_array_pairs = index_array_pairs_by_source.setdefault(
+                id(array._array), [])
+            index_array_pairs.append((i, array))
+        all_results = [None] * len(arrays)
+        for index_array_pairs in index_array_pairs_by_source.itervalues():
+            indices = [index for index, array in index_array_pairs]
+            arrays = [array for index, array in index_array_pairs]
+            results = _Aggregation._ndarrays_common_source(arrays)
+            for i, ndarray in zip(indices, results):
+                all_results[i] = ndarray
+        return all_results
+
+    @staticmethod
+    def _ndarrays_common_source(arrays):
+        chunk_handlers = [array.chunk_handler() for array in arrays]
+        for chunk_handler in chunk_handlers:
+            chunk_handler.bootstrap()
+
+        def meta_chunk_handler(chunk):
+            for chunk_handler in chunk_handlers:
+                chunk_handler.add_chunk(chunk)
+
+        src_array = arrays[0]._array
+        _process_chunks(src_array, meta_chunk_handler)
+
+        results = [chunk_handler.result() for chunk_handler in chunk_handlers]
+        return results
+
     def __init__(self, array, axis, chunk_handler_class, kwargs):
         self._array = array
         self._axis = axis
@@ -750,8 +783,10 @@ class _Aggregation(Array):
                             self._chunk_handler_class, self._kwargs)
 
     def ndarray(self):
-        result = ndarrays([self])[0]
-        return result
+        chunk_handler = self.chunk_handler()
+        chunk_handler.bootstrap()
+        _process_chunks(self._array, chunk_handler.add_chunk)
+        return chunk_handler.result()
 
     def masked_array(self):
         raise RuntimeError()
