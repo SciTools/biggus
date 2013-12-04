@@ -667,7 +667,7 @@ class _ChunkHandler(object):
 
 class _Mean(_ChunkHandler):
     def bootstrap(self):
-        first_slice = self.array[self.axis].ndarray()
+        first_slice = self.array[0].ndarray()
         self.running_total = np.array(first_slice)
         self.t = np.empty_like(first_slice)
 
@@ -689,7 +689,7 @@ class _Std(_ChunkHandler):
     # http://zach.in.tu-clausthal.de/teaching/info_literatur/Welford.pdf
 
     def bootstrap(self):
-        first_slice = self.array[self.axis].ndarray()
+        first_slice = self.array[0].ndarray()
         self.a = np.array(first_slice)
         self.q = np.zeros_like(first_slice)
         self.t = np.empty_like(first_slice)
@@ -802,6 +802,7 @@ def mean(a, axis=None):
     NB. Currently limited to axis=0.
 
     """
+    assert axis == 0
     return _Aggregation(a, axis, _Mean, {})
 
 
@@ -812,6 +813,7 @@ def std(a, axis=None, ddof=0):
     NB. Currently limited to axis=0.
 
     """
+    assert axis == 0
     return _Aggregation(a, axis, _Std, {'ddof': ddof})
 
 
@@ -895,6 +897,16 @@ def _process_chunks(array, chunk_handler):
         chunks.put(chunk)
 
     chunks.join()
+
+
+def _process_chunks_simple(array, chunk_handler):
+    # Simple, single-threaded version for debugging.
+    size = array.shape[0]
+    chunk_size = 10
+
+    for i in range(1, size, chunk_size):
+        chunk = array[i:i + chunk_size].ndarray()
+        chunk_handler(chunk)
 
 
 # TODO: Test
