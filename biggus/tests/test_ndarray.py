@@ -19,35 +19,7 @@ import unittest
 import numpy
 
 import biggus
-
-
-class _AccessCounter(object):
-    """
-    Something that acts like a NumPy ndarray, but which records how
-    many times each element has been read.
-
-    """
-    def __init__(self, ndarray):
-        self._ndarray = ndarray
-        self.counts = numpy.zeros(ndarray.shape)
-
-    @property
-    def ndim(self):
-        return self._ndarray.ndim
-
-    @property
-    def shape(self):
-        return self._ndarray.shape
-
-    def __array__(self):
-        return self._ndarray
-
-    def __getitem__(self, keys):
-        self.counts[keys] += 1
-        return self._ndarray[keys]
-
-    def unique_counts(self):
-        return set(numpy.unique(self.counts))
+from biggus.tests import AccessCounter
 
 
 class TestNdarray(unittest.TestCase):
@@ -56,7 +28,7 @@ class TestNdarray(unittest.TestCase):
         shape = (500, 30, 40)
         size = numpy.prod(shape)
         raw_data = numpy.linspace(0, 1, num=size).reshape(shape)
-        data = _AccessCounter(raw_data)
+        data = AccessCounter(raw_data)
         array = biggus.NumpyArrayAdapter(data)
         mean_array = biggus.mean(array, axis=0)
         std_array = biggus.std(array, axis=0)
