@@ -19,39 +19,7 @@ import unittest
 import numpy as np
 
 import biggus
-
-
-class _AccessCounter(object):
-    """
-    Something that acts like a NumPy ndarray, but which records how
-    many times each element has been read.
-
-    """
-    def __init__(self, ndarray):
-        self._ndarray = ndarray
-        self.counts = np.zeros(ndarray.shape)
-
-    @property
-    def dtype(self):
-        return self._ndarray.dtype
-
-    @property
-    def ndim(self):
-        return self._ndarray.ndim
-
-    @property
-    def shape(self):
-        return self._ndarray.shape
-
-    def __array__(self):
-        return self._ndarray
-
-    def __getitem__(self, keys):
-        self.counts[keys] += 1
-        return self._ndarray[keys]
-
-    def unique_counts(self):
-        return set(np.unique(self.counts))
+from biggus.tests import AccessCounter
 
 
 class TestElementwise(unittest.TestCase):
@@ -76,8 +44,8 @@ class TestElementwise(unittest.TestCase):
 
             # Check the elementwise operation doesn't actually read any
             # data.
-            data1 = _AccessCounter(raw_data1)
-            data2 = _AccessCounter(raw_data2)
+            data1 = AccessCounter(raw_data1)
+            data2 = AccessCounter(raw_data2)
             array1 = biggus.NumpyArrayAdapter(data1)
             array2 = biggus.NumpyArrayAdapter(data2)
             op_array = biggus_op(array1, array2)

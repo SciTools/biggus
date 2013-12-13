@@ -19,35 +19,7 @@ import unittest
 import numpy as np
 
 import biggus
-
-
-class _AccessCounter(object):
-    """
-    Something that acts like a NumPy ndarray, but which records how
-    many times each element has been read.
-
-    """
-    def __init__(self, ndarray):
-        self._ndarray = ndarray
-        self.counts = np.zeros(ndarray.shape)
-
-    @property
-    def ndim(self):
-        return self._ndarray.ndim
-
-    @property
-    def shape(self):
-        return self._ndarray.shape
-
-    def __array__(self):
-        return self._ndarray
-
-    def __getitem__(self, keys):
-        self.counts[keys] += 1
-        return self._ndarray[keys]
-
-    def unique_counts(self):
-        return set(np.unique(self.counts))
+from biggus.tests import AccessCounter
 
 
 class TestAggregation(unittest.TestCase):
@@ -71,7 +43,7 @@ class TestAggregation(unittest.TestCase):
 
             # Check the aggregation operation doesn't actually read any
             # data.
-            data = _AccessCounter(raw_data)
+            data = AccessCounter(raw_data)
             array = biggus.NumpyArrayAdapter(data)
             op_array = biggus_op(array, axis=0, **kwargs)
             self.assertIsInstance(op_array, biggus.Array)
