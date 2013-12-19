@@ -87,6 +87,11 @@ class Array(object):
                                                  self.shape, self.dtype)
 
     @property
+    def fill_value(self):
+        """The value used to fill in masked values where necessary."""
+        return np.ma.empty(0, dtype=self.dtype).fill_value
+
+    @property
     def ndim(self):
         """The number of dimensions in this virtual array."""
         return len(self.shape)
@@ -143,6 +148,13 @@ class _ArrayAdapter(Array):
     @property
     def dtype(self):
         return self._concrete.dtype
+
+    @property
+    def fill_value(self):
+        fill_value = getattr(self._concrete, 'fill_value', None)
+        if fill_value is None:
+            fill_value = Array.fill_value.fget(self)
+        return fill_value
 
     @property
     def shape(self):
@@ -282,7 +294,7 @@ class _ArrayAdapter(Array):
         # Array, so where we've ended up with an array-scalar,
         # "inflate" it back to a 0-dimensional array.
         if array.ndim == 0 or not ma.isMaskedArray(array):
-            array = ma.MaskedArray(array)
+            array = ma.MaskedArray(array, fill_value=self.fill_value)
         return array
 
 
@@ -327,7 +339,10 @@ class NumpyArrayAdapter(_ArrayAdapter):
                 is_scalar = [isinstance(key, int) for key in cut_keys]
                 dimensions -= np.cumsum(is_scalar)
             else:
-                array = self._concrete
+                # Use ellipsis indexing to ensure we have a real ndarray
+                # instance to work with. (Otherwise self._concrete would
+                # need to implement `take` or `__array__`.)
+                array = self._concrete[...]
             # ... and then do each tuple in turn.
             for i, key in tuple_keys:
                 array = np.take(array, key, axis=dimensions[i])
@@ -372,16 +387,23 @@ class ArrayStack(Array):
         first_array = stack.flat[0]
         item_shape = first_array.shape
         dtype = first_array.dtype
+        fill_value = first_array.fill_value
         for array in stack.flat:
-            if array.shape != item_shape or array.dtype != dtype:
+            if (array.shape != item_shape or array.dtype != dtype or
+                    array.fill_value != fill_value):
                 raise ValueError('invalid sub-array')
         self._stack = stack
         self._item_shape = item_shape
         self._dtype = dtype
+        self._fill_value = fill_value
 
     @property
     def dtype(self):
         return self._dtype
+
+    @property
+    def fill_value(self):
+        return self._fill_value
 
     @property
     def shape(self):
@@ -430,11 +452,11 @@ class ArrayStack(Array):
         return data
 
     def masked_array(self):
-        data = ma.empty(self.shape, dtype=self.dtype)
+        data = ma.empty(self.shape, dtype=self.dtype,
+                        fill_value=self.fill_value)
         for index in np.ndindex(self._stack.shape):
             masked_array = self._stack[index].masked_array()
             data[index] = masked_array
-            data.fill_value = masked_array.fill_value
         return data
 
 
@@ -450,6 +472,7 @@ class LinearMosaic(Array):
         # Make sure all the tiles are compatible
         common_shape = list(first.shape)
         common_dtype = first.dtype
+        common_fill_value = first.fill_value
         del common_shape[axis]
         for tile in tiles[1:]:
             shape = list(tile.shape)
@@ -458,6 +481,8 @@ class LinearMosaic(Array):
                 raise ValueError('inconsistent tile shapes')
             if tile.dtype != common_dtype:
                 raise ValueError('inconsistent tile dtypes')
+            if tile.fill_value != common_fill_value:
+                raise ValueError('inconsistent tile fill_values')
         self._tiles = tiles
         self._axis = axis
         self._cached_shape = None
@@ -465,6 +490,10 @@ class LinearMosaic(Array):
     @property
     def dtype(self):
         return self._tiles[0].dtype
+
+    @property
+    def fill_value(self):
+        return self._tiles[0].fill_value
 
     @property
     def shape(self):
@@ -556,7 +585,8 @@ class LinearMosaic(Array):
         return data
 
     def masked_array(self):
-        data = ma.empty(self.shape, dtype=self.dtype)
+        data = ma.empty(self.shape, dtype=self.dtype,
+                        fill_value=self.fill_value)
         offset = 0
         indices = [slice(None)] * self.ndim
         axis = self._axis
