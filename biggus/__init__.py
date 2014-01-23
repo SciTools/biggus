@@ -135,7 +135,7 @@ class _ArrayAdapter(Array):
         # concrete must have:
         #   dtype
         #   shape
-        self._concrete = concrete
+        self.concrete = concrete
         if not isinstance(keys, tuple):
             keys = (keys,)
         assert len(keys) <= len(concrete.shape)
@@ -147,18 +147,18 @@ class _ArrayAdapter(Array):
 
     @property
     def dtype(self):
-        return self._concrete.dtype
+        return self.concrete.dtype
 
     @property
     def fill_value(self):
-        fill_value = getattr(self._concrete, 'fill_value', None)
+        fill_value = getattr(self.concrete, 'fill_value', None)
         if fill_value is None:
             fill_value = Array.fill_value.fget(self)
         return fill_value
 
     @property
     def shape(self):
-        shape = _sliced_shape(self._concrete.shape, self._keys)
+        shape = _sliced_shape(self.concrete.shape, self._keys)
         return shape
 
     def _cleanup_new_key(self, key, size, axis):
@@ -229,7 +229,7 @@ class _ArrayAdapter(Array):
             raise IndexError('too many keys')
 
         result_keys = []
-        shape = list(self._concrete.shape)
+        shape = list(self.concrete.shape)
         src_keys = list(self._keys or [])
         new_keys = list(keys)
 
@@ -271,7 +271,7 @@ class _ArrayAdapter(Array):
                 result_keys.append(result_key)
                 axis += 1
 
-        return type(self)(self._concrete, tuple(result_keys))
+        return type(self)(self.concrete, tuple(result_keys))
 
     @abstractmethod
     def _apply_keys(self):
@@ -335,19 +335,19 @@ class NumpyArrayAdapter(_ArrayAdapter):
                 cut_keys = list(keys)
                 for i, key in tuple_keys:
                     cut_keys[i] = slice(None)
-                array = self._concrete[tuple(cut_keys)]
+                array = self.concrete[tuple(cut_keys)]
                 is_scalar = [isinstance(key, int) for key in cut_keys]
                 dimensions -= np.cumsum(is_scalar)
             else:
                 # Use ellipsis indexing to ensure we have a real ndarray
-                # instance to work with. (Otherwise self._concrete would
+                # instance to work with. (Otherwise self.concrete would
                 # need to implement `take` or `__array__`.)
-                array = self._concrete[...]
+                array = self.concrete[...]
             # ... and then do each tuple in turn.
             for i, key in tuple_keys:
                 array = np.take(array, key, axis=dimensions[i])
         else:
-            array = self._concrete.__getitem__(keys)
+            array = self.concrete.__getitem__(keys)
         return array
 
 
@@ -374,7 +374,7 @@ class OrthoArrayAdapter(_ArrayAdapter):
 
     """
     def _apply_keys(self):
-        array = self._concrete.__getitem__(self._keys)
+        array = self.concrete.__getitem__(self._keys)
         return array
 
 
