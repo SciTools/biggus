@@ -82,6 +82,8 @@ class Array(object):
         """
         return [array.ndarray() for array in arrays]
 
+    __hash__ = None
+
     def __repr__(self):
         return '<{} shape={} dtype={!r}>'.format(type(self).__name__,
                                                  self.shape, self.dtype)
