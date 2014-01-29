@@ -78,6 +78,10 @@ class TestAggregation(unittest.TestCase):
         self._test_aggregation(biggus.std, np.std, ddof=0)
         self._test_aggregation(biggus.std, np.std, ddof=1)
 
+    def test_var(self):
+        self._test_aggregation(biggus.var, np.var, ddof=0)
+        self._test_aggregation(biggus.var, np.var, ddof=1)
+
 
 if __name__ == '__main__':
     unittest.main()
