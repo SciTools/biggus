@@ -827,26 +827,69 @@ class _Aggregation(Array):
         return self._chunk_handler_class(self._array, self._axis, self._kwargs)
 
 
+def _normalise_axis(axis):
+    # Convert `axis` to None, or a tuple of ints, or raise a
+    # TypeError.
+    if axis is None:
+        axes = None
+    elif isinstance(axis, int):
+        axes = (axis,)
+    elif (isinstance(axis, collections.Iterable) and
+            not isinstance(axis, (basestring, collections.Mapping)) and
+            all(map(lambda x: isinstance(x, int), axis))):
+        axes = tuple(axis)
+    else:
+        raise TypeError('axis must be None, int, or iterable of ints')
+    return axes
+
+
 def mean(a, axis=None):
     """
-    Returns the mean of an Array as another Array.
+    Request the mean of an Array over any number of axes.
 
-    NB. Currently limited to axis=0.
+    .. note:: Currently limited to axis=0.
+
+    :param axis: Axis or axes along which the operation is performed.
+                 The default (axis=None) is to perform the operation
+                 over all the dimensions of the input array.
+                 The axis may be negative, in which case it counts from
+                 the last to the first axis.
+                 If axis is a tuple of ints, the operation is performed
+                 over multiple axes.
+    :type axis: None, or int, or iterable of ints.
+    :return: The Array representing the requested mean.
+    :rtype: Array
 
     """
-    assert axis == 0
-    return _Aggregation(a, axis, _Mean, {})
+    axes = _normalise_axis(axis)
+    assert axes == (0,)
+    return _Aggregation(a, axes[0], _Mean, {})
 
 
 def std(a, axis=None, ddof=0):
     """
-    Return the mean of an Array as another Array.
+    Request the standard deviation of an Array over any number of axes.
 
-    NB. Currently limited to axis=0.
+    .. note:: Currently limited to axis=0.
+
+    :param axis: Axis or axes along which the operation is performed.
+                 The default (axis=None) is to perform the operation
+                 over all the dimensions of the input array.
+                 The axis may be negative, in which case it counts from
+                 the last to the first axis.
+                 If axis is a tuple of ints, the operation is performed
+                 over multiple axes.
+    :type axis: None, or int, or iterable of ints.
+    :param int ddof: Delta Degrees of Freedom. The divisor used in
+                     calculations is N - ddof, where N represents the
+                     number of elements. By default ddof is zero.
+    :return: The Array representing the requested standard deviation.
+    :rtype: Array
 
     """
-    assert axis == 0
-    return _Aggregation(a, axis, _Std, {'ddof': ddof})
+    axes = _normalise_axis(axis)
+    assert axes == (0,)
+    return _Aggregation(a, axes[0], _Std, {'ddof': ddof})
 
 
 class _Elementwise(Array):
