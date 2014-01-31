@@ -1,4 +1,4 @@
-# (C) British Crown Copyright 2012 - 2013, Met Office
+# (C) British Crown Copyright 2012 - 2014, Met Office
 #
 # This file is part of Biggus.
 #
@@ -59,7 +59,7 @@ import numpy as np
 import numpy.ma as ma
 
 
-__version__ = '0.3'
+__version__ = '0.4.x'
 
 
 class Array(object):

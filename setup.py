@@ -2,7 +2,7 @@ from distutils.core import setup
 
 setup(
     name='Biggus',
-    version='0.3',
+    version='0.4.x',
     url='https://github.com/SciTools/biggus',
     author='Richard Hattersley',
     author_email='rhattersley@gmail.com',
