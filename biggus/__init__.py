@@ -679,10 +679,12 @@ def save(sources, targets):
 class _ChunkHandler(object):
     __metaclass__ = ABCMeta
 
-    def __init__(self, array, axis, kwargs):
+    def __init__(self, array, axis, kwargs, masked=False):
         self.array = array
         self.axis = axis
         self.kwargs = kwargs
+        self.masked = masked
+        self._mod = ma if self.masked else np
 
     @abstractmethod
     def bootstrap(self):
@@ -700,27 +702,57 @@ class _ChunkHandler(object):
     def dtype(self):
         pass
 
+    def _bootstrap_mask(self, mask, shape):
+        if mask.shape:
+            self.running_count = np.asarray(~mask, dtype=self.dtype)
+        else:
+            self.running_count = np.zeros(shape, dtype=self.dtype)
+            if not mask:
+                self.running_count += 1
+
 
 class _Mean(_ChunkHandler):
-    def __init__(self, array, axis, kwargs):
-        _ChunkHandler.__init__(self, array, axis, kwargs)
+    def __init__(self, array, axis, kwargs, masked=False):
+        _ChunkHandler.__init__(self, array, axis, kwargs, masked=masked)
         # Calculate the equivalent dtype of the result.
         self._dtype = (np.array([0], dtype=self.array.dtype) / 1.).dtype
 
     def bootstrap(self):
-        first_slice = np.asarray(self.array[0].ndarray(), dtype=self.dtype)
-        self.running_total = np.array(first_slice)
-        self.t = np.empty_like(first_slice)
+        first_slice = self.array[0]
+        shape = first_slice.shape
+        self.running_total = np.zeros(shape, dtype=self.dtype)
+
+        if self.masked:
+            first_slice = first_slice.masked_array()
+            self.temp = ma.empty(shape, dtype=self.dtype)
+            self.running_total += first_slice.filled(0)
+            self._bootstrap_mask(first_slice.mask, shape)
+        else:
+            first_slice = first_slice.ndarray()
+            self.temp = np.empty(shape, dtype=self.dtype)
+            self.running_total += first_slice
 
     def add_chunk(self, chunk):
-        np.sum(chunk, axis=self.axis, out=self.t)
-        self.running_total += self.t
+        if self.masked:
+            ma.sum(chunk, axis=self.axis, out=self.temp)
+            self.running_total += self.temp.filled(0)
+            self.running_count += ma.count(chunk, axis=self.axis)
+        else:
+            np.sum(chunk, axis=self.axis, out=self.temp)
+            self.running_total += self.temp
 
     def result(self):
-        array = self.running_total / self.array.shape[0]
+        if self.masked:
+            # Avoid any runtime-warning for divide by zero.
+            mask = self.running_count == 0
+            denominator = ma.array(self.running_count, mask=mask)
+            array = ma.array(self.running_total, mask=mask) / denominator
+        else:
+            array = self.running_total / self.array.shape[0]
+
         # Promote array-scalar to 0-dimensional array.
         if array.ndim == 0:
-            array = np.array(array)
+            array = self._mod.array(array)
         return array
 
     @property
@@ -736,40 +768,79 @@ class _Std(_ChunkHandler):
     # Technometrics 4 (3): 419-420.
     # http://zach.in.tu-clausthal.de/teaching/info_literatur/Welford.pdf
 
-    def __init__(self, array, axis, kwargs):
-        _ChunkHandler.__init__(self, array, axis, kwargs)
+    def __init__(self, array, axis, kwargs, masked=False):
+        _ChunkHandler.__init__(self, array, axis, kwargs, masked=masked)
         # Calculate the equivalent dtype of the result.
         self._dtype = (np.array([0], dtype=self.array.dtype) / 1.).dtype
 
     def bootstrap(self):
-        first_slice = np.asarray(self.array[0].ndarray(), dtype=self.dtype)
-        self.a = np.array(first_slice, dtype=self.dtype)
-        self.q = np.zeros_like(first_slice)
-        self.t = np.empty_like(first_slice)
-        self.k = 1
+        first_slice = self.array[0]
+        shape = first_slice.shape
+
+        if self.masked:
+            first_slice = first_slice.masked_array().flatten()
+            self.a = first_slice.filled(0).astype(self.dtype)
+            self.q = np.zeros(shape, dtype=self.dtype).flatten()
+            self._bootstrap_mask(first_slice.mask, shape)
+            self.running_count = self.running_count.flatten()
+        else:
+            self.k = 1
+            first_slice = first_slice.ndarray()
+            self.a = np.array(first_slice, dtype=self.dtype)
+            self.q = np.zeros_like(first_slice, dtype=self.dtype)
+            self.temp = np.empty_like(first_slice, dtype=self.dtype)
 
     def add_chunk(self, chunk):
-        chunk = np.rollaxis(chunk, self.axis)
-        for slice in chunk:
-            self.k += 1
+        for chunk_slice in chunk:
+            if self.masked:
+                chunk_slice = chunk_slice.flatten()
+                bootstrapped = self.running_count != 0
+                have_data = ~ma.getmaskarray(chunk_slice)
+                chunk_data = ma.array(chunk_slice).filled(0)
 
-            # Compute A(k)
-            np.subtract(slice, self.a, out=self.t)
-            self.t *= 1. / self.k
-            self.a += self.t
+                # Bootstrap a(k) where necessary.
+                self.a[~bootstrapped] = chunk_data[~bootstrapped]
 
-            # Compute Q(k)
-            self.t *= self.t
-            self.t *= self.k * (self.k - 1)
-            self.q += self.t
+                self.running_count += have_data
+
+                # Compute a(k).
+                do_stuff = bootstrapped & have_data
+                temp = ((chunk_data[do_stuff] - self.a[do_stuff]) /
+                        self.running_count[do_stuff])
+                self.a[do_stuff] += temp
+
+                # Compute q(k).
+                temp *= temp
+                temp *= (self.running_count[do_stuff] *
+                         (self.running_count[do_stuff] - 1))
+                self.q[do_stuff] += temp
+            else:
+                self.k += 1
+
+                # Compute a(k).
+                self._mod.subtract(chunk_slice, self.a, out=self.temp)
+                self.temp *= 1. / self.k
+                self.a += self.temp
+
+                # Compute q(k).
+                self.temp *= self.temp
+                self.temp *= self.k * (self.k - 1)
+                self.q += self.temp
 
     def result(self):
-        assert self.k == self.array.shape[self.axis]
-        self.q /= (self.k - self.kwargs['ddof'])
-        result = np.sqrt(self.q)
+        ddof = self.kwargs['ddof']
+        if self.masked:
+            mask = self.running_count == 0
+            denominator = ma.array(self.running_count, mask=mask) - ddof
+            q = ma.array(self.q, mask=mask) / denominator
+            result = ma.sqrt(q)
+            result.shape = self.array[0].shape
+        else:
+            self.q /= (self.k - ddof)
+            result = np.sqrt(self.q)
         # Promote array-scalar to 0-dimensional array.
         if result.ndim == 0:
-            result = np.array(result)
+            result = self._mod.array(result)
         return result
 
     @property
@@ -779,12 +850,8 @@ class _Std(_ChunkHandler):
 
 class _Var(_Std):
     def result(self):
-        assert self.k == self.array.shape[self.axis]
-        array = self.q / (self.k - self.kwargs['ddof'])
-        # Promote array-scalar to 0-dimensional array.
-        if array.ndim == 0:
-            array = np.array(array)
-        return array
+        result = _Std.result(self)
+        return result * result
 
 
 class _Aggregation(Array):
@@ -853,17 +920,21 @@ class _Aggregation(Array):
         return _Aggregation(self._array[keys], self._axis,
                             self._chunk_handler_class, self._kwargs)
 
-    def ndarray(self):
-        chunk_handler = self.chunk_handler()
+    def _aggregated(self, masked=False):
+        chunk_handler = self.chunk_handler(masked=masked)
         chunk_handler.bootstrap()
-        _process_chunks(self._array, chunk_handler.add_chunk)
+        _process_chunks(self._array, chunk_handler.add_chunk, masked)
         return chunk_handler.result()
 
-    def masked_array(self):
-        raise RuntimeError()
+    def ndarray(self):
+        return self._aggregated(masked=False)
 
-    def chunk_handler(self):
-        return self._chunk_handler_class(self._array, self._axis, self._kwargs)
+    def masked_array(self):
+        return self._aggregated(masked=True)
+
+    def chunk_handler(self, masked=False):
+        return self._chunk_handler_class(self._array, self._axis,
+                                         self._kwargs, masked=masked)
 
 
 def _normalise_axis(axis):
@@ -1013,7 +1084,7 @@ def sub(a, b):
     return _Elementwise(a, b, np.subtract, np.ma.subtract)
 
 
-def _process_chunks(array, chunk_handler):
+def _process_chunks(array, chunk_handler, masked=False):
     #   chunk_size = 2      => 54s ~ 115% CPU
     #   chunk_size = 10     => 42s ~ 105% CPU (quicker than CDO!)
     #   chunk_size = 100    => 54s
@@ -1033,19 +1104,21 @@ def _process_chunks(array, chunk_handler):
     thread.start()
 
     for i in range(1, size, chunk_size):
-        chunk = array[i:i + chunk_size].ndarray()
+        chunk = array[i:i + chunk_size]
+        chunk = chunk.masked_array() if masked else chunk.ndarray()
         chunks.put(chunk)
 
     chunks.join()
 
 
-def _process_chunks_simple(array, chunk_handler):
+def _process_chunks_simple(array, chunk_handler, masked=False):
     # Simple, single-threaded version for debugging.
     size = array.shape[0]
     chunk_size = 10
 
     for i in range(1, size, chunk_size):
-        chunk = array[i:i + chunk_size].ndarray()
+        chunk = array[i:i + chunk_size]
+        chunk = chunk.masked_array() if masked else chunk.ndarray()
         chunk_handler(chunk)
 
 

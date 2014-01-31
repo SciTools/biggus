@@ -17,6 +17,7 @@
 """Unit tests for `biggus.std` and `biggus.var`."""
 
 import numpy as np
+import numpy.ma as ma
 import unittest
 
 import biggus
@@ -85,7 +86,7 @@ class TestNumpyArrayAdapter(unittest.TestCase):
             expected = nfunc(data, axis=0, ddof=ddof)
             if expected.ndim == 0:
                 expected = np.asarray(expected)
-            np.testing.assert_array_equal(result, expected)
+            np.testing.assert_array_almost_equal(result, expected)
 
     def test_flat_int(self):
         for ddof in range(2):
@@ -102,6 +103,39 @@ class TestNumpyArrayAdapter(unittest.TestCase):
     def test_multi_float(self):
         for ddof in range(2):
             self._check(self.data, dtype=np.float, shape=(3, 4), ddof=ddof)
+
+
+class TestNumpyArrayAdapterMasked(unittest.TestCase):
+    def _check(self, data):
+        array = biggus.NumpyArrayAdapter(data)
+        result = std(array, axis=0, ddof=0).masked_array()
+        expected = ma.std(data, axis=0, ddof=0)
+        if expected.ndim == 0:
+            expected = ma.asarray(expected)
+        np.testing.assert_array_equal(result.filled(), expected.filled())
+        np.testing.assert_array_equal(result.mask, expected.mask)
+
+    def test_no_mask_flat(self):
+        for dtype in [np.int, np.float]:
+            data = ma.arange(12, dtype=dtype)
+            self._check(data)
+
+    def test_no_mask_multi(self):
+        for dtype in [np.int, np.float]:
+            data = ma.arange(12, dtype=dtype).reshape(3, 4)
+            self._check(data)
+
+    def test_flat(self):
+        for dtype in [np.int]:
+            data = ma.arange(12, dtype=dtype)
+            data[::2] = ma.masked
+            self._check(data)
+
+    def test_multi(self):
+        for dtype in [np.int, np.float]:
+            data = ma.arange(12, dtype=dtype)
+            data[::2] = ma.masked
+            self._check(data.reshape(3, 4))
 
 
 if __name__ == '__main__':
