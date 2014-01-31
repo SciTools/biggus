@@ -17,6 +17,7 @@
 """Unit tests for `biggus.mean`."""
 
 import numpy as np
+import numpy.ma as ma
 import unittest
 
 import biggus
@@ -90,6 +91,55 @@ class TestNumpyArrayAdapter(unittest.TestCase):
 
     def test_multi_float(self):
         self._check(self.data, dtype=np.float, shape=(3, 4))
+
+
+class TestNumpyArrayAdapterMasked(unittest.TestCase):
+    def _check(self, data):
+        array = biggus.NumpyArrayAdapter(data)
+        result = mean(array, axis=0).masked_array()
+        expected = ma.mean(data, axis=0)
+        if expected.ndim == 0:
+            expected = ma.asarray(expected)
+        np.testing.assert_array_equal(result.filled(), expected.filled())
+        np.testing.assert_array_equal(result.mask, expected.mask)
+
+    def test_no_mask_flat(self):
+        for dtype in [np.int, np.float]:
+            data = ma.arange(12, dtype=dtype)
+            self._check(data)
+
+    def test_no_mask_multi(self):
+        for dtype in [np.int, np.float]:
+            data = ma.arange(12, dtype=dtype).reshape(3, 4)
+            self._check(data)
+
+    def test_flat(self):
+        for dtype in [np.int, np.float]:
+            data = ma.arange(12, dtype=dtype)
+            data[::2] = ma.masked
+            self._check(data)
+
+            data.mask = ma.nomask
+            data[1::2] = ma.masked
+            self._check(data)
+
+    def test_multi(self):
+        for dtype in [np.int, np.float]:
+            data = ma.arange(12, dtype=dtype)
+            data[::2] = ma.masked
+            self._check(data.reshape(3, 4))
+
+            data = ma.arange(12, dtype=dtype)
+            data[1::2] = ma.masked
+            self._check(data.reshape(3, 4))
+
+            data = ma.arange(12, dtype=dtype).reshape(3, 4)
+            data[::2] = ma.masked
+            self._check(data)
+
+            data = ma.arange(12, dtype=dtype).reshape(3, 4)
+            data[1::2] = ma.masked
+            self._check(data)
 
 
 if __name__ == '__main__':
