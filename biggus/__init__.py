@@ -696,10 +696,19 @@ class _ChunkHandler(object):
     def result(self):
         pass
 
+    @abstractproperty
+    def dtype(self):
+        pass
+
 
 class _Mean(_ChunkHandler):
+    def __init__(self, array, axis, kwargs):
+        _ChunkHandler.__init__(self, array, axis, kwargs)
+        # Calculate the equivalent dtype of the result.
+        self._dtype = (np.array([0], dtype=self.array.dtype) / 1.).dtype
+
     def bootstrap(self):
-        first_slice = self.array[0].ndarray()
+        first_slice = np.asarray(self.array[0].ndarray(), dtype=self.dtype)
         self.running_total = np.array(first_slice)
         self.t = np.empty_like(first_slice)
 
@@ -708,8 +717,15 @@ class _Mean(_ChunkHandler):
         self.running_total += self.t
 
     def result(self):
-        self.running_total /= self.array.shape[0]
-        return self.running_total
+        array = self.running_total / self.array.shape[0]
+        # Promote array-scalar to 0-dimensional array.
+        if array.ndim == 0:
+            array = np.array(array)
+        return array
+
+    @property
+    def dtype(self):
+        return self._dtype
 
 
 class _Std(_ChunkHandler):
@@ -720,9 +736,14 @@ class _Std(_ChunkHandler):
     # Technometrics 4 (3): 419-420.
     # http://zach.in.tu-clausthal.de/teaching/info_literatur/Welford.pdf
 
+    def __init__(self, array, axis, kwargs):
+        _ChunkHandler.__init__(self, array, axis, kwargs)
+        # Calculate the equivalent dtype of the result.
+        self._dtype = (np.array([0], dtype=self.array.dtype) / 1.).dtype
+
     def bootstrap(self):
-        first_slice = self.array[0].ndarray()
-        self.a = np.array(first_slice)
+        first_slice = np.asarray(self.array[0].ndarray(), dtype=self.dtype)
+        self.a = np.array(first_slice, dtype=self.dtype)
         self.q = np.zeros_like(first_slice)
         self.t = np.empty_like(first_slice)
         self.k = 1
@@ -746,7 +767,24 @@ class _Std(_ChunkHandler):
         assert self.k == self.array.shape[self.axis]
         self.q /= (self.k - self.kwargs['ddof'])
         result = np.sqrt(self.q)
+        # Promote array-scalar to 0-dimensional array.
+        if result.ndim == 0:
+            result = np.array(result)
         return result
+
+    @property
+    def dtype(self):
+        return self._dtype
+
+
+class _Var(_Std):
+    def result(self):
+        assert self.k == self.array.shape[self.axis]
+        array = self.q / (self.k - self.kwargs['ddof'])
+        # Promote array-scalar to 0-dimensional array.
+        if array.ndim == 0:
+            array = np.array(array)
+        return array
 
 
 class _Aggregation(Array):
@@ -795,10 +833,11 @@ class _Aggregation(Array):
         self._axis = axis
         self._chunk_handler_class = chunk_handler_class
         self._kwargs = kwargs
+        self._dtype = self.chunk_handler().dtype
 
     @property
     def dtype(self):
-        return self._array.dtype
+        return self._dtype
 
     @property
     def shape(self):
@@ -889,7 +928,33 @@ def std(a, axis=None, ddof=0):
     """
     axes = _normalise_axis(axis)
     assert axes == (0,)
-    return _Aggregation(a, axes[0], _Std, {'ddof': ddof})
+    return _Aggregation(a, axes[0], _Std, dict(ddof=ddof))
+
+
+def var(a, axis=None, ddof=0):
+    """
+    Request the variance of an Array over any number of axes.
+
+    .. note:: Currently limited to axis=0.
+
+    :param axis: Axis or axes along which the operation is performed.
+                 The default (axis=None) is to perform the operation
+                 over all the dimensions of the input array.
+                 The axis may be negative, in which case it counts from
+                 the last to the first axis.
+                 If axis is a tuple of ints, the operation is performed
+                 over multiple axes.
+    :type axis: None, or int, or iterable of ints.
+    :param int ddof: Delta Degrees of Freedom. The divisor used in
+                     calculations is N - ddof, where N represents the
+                     number of elements. By default ddof is zero.
+    :return: The Array representing the requested variance.
+    :rtype: Array
+
+    """
+    axes = _normalise_axis(axis)
+    assert axes == (0,)
+    return _Aggregation(a, axes[0], _Var, dict(ddof=ddof))
 
 
 class _Elementwise(Array):
