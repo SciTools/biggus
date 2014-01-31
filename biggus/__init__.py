@@ -62,6 +62,86 @@ import numpy.ma as ma
 __version__ = '0.4.x'
 
 
+class Engine(object):
+    """
+    Represents a way to evaluate lazy expressions.
+
+    """
+
+    __metaclass__ = ABCMeta
+
+    @abstractmethod
+    def process_chunks(self, array, chunk_handler, masked=False):
+        # NB. This is a simple interface just to get things started.
+        # Eventually it'd probably be more like:
+        #   engine.compute(list_of_arrays)
+        pass
+
+
+class SimpleEngine(Engine):
+    """
+    A single-threaded evaluation engine.
+
+    Because of its predictable behaviour and simple error handling this
+    engine is particularly convenient for debugging.
+
+    """
+    def process_chunks(self, array, chunk_handler, masked=False):
+        # Simple, single-threaded version for debugging.
+        size = array.shape[0]
+        chunk_size = 10
+
+        for i in range(1, size, chunk_size):
+            chunk = array[i:i + chunk_size]
+            chunk = chunk.masked_array() if masked else chunk.ndarray()
+            chunk_handler(chunk)
+
+
+class ThreadedEngine(object):
+    """
+    A multi-threaded evaluation engine.
+
+    Using a simple producer-consumer pattern, the main thread generates
+    source data whilst a worker thread handles the aggregation
+    calculations.
+
+    """
+    def process_chunks(self, array, chunk_handler, masked=False):
+        #   chunk_size = 2      => 54s ~ 115% CPU
+        #   chunk_size = 10     => 42s ~ 105% CPU (quicker than CDO!)
+        #   chunk_size = 100    => 54s
+        #   chunk_size = 1000   => 63s
+        size = array.shape[0]
+        chunk_size = 10
+        chunks = Queue.Queue(maxsize=3)
+
+        def worker():
+            while True:
+                chunk = chunks.get()
+                chunk_handler(chunk)
+                chunks.task_done()
+
+        thread = threading.Thread(target=worker)
+        thread.daemon = True
+        thread.start()
+
+        for i in range(1, size, chunk_size):
+            chunk = array[i:i + chunk_size]
+            chunk = chunk.masked_array() if masked else chunk.ndarray()
+            chunks.put(chunk)
+
+        chunks.join()
+
+
+engine = ThreadedEngine()
+"""
+The current lazy evaluation engine.
+
+Defaults to an instance of :class:`ThreadedEngine`.
+
+"""
+
+
 class Array(object):
     """
     A virtual array which can be sliced to create smaller virtual
@@ -890,7 +970,7 @@ class _Aggregation(Array):
                 chunk_handler.add_chunk(chunk)
 
         src_array = arrays[0]._array
-        _process_chunks(src_array, meta_chunk_handler)
+        engine.process_chunks(src_array, meta_chunk_handler)
 
         results = [chunk_handler.result() for chunk_handler in chunk_handlers]
         return results
@@ -923,7 +1003,7 @@ class _Aggregation(Array):
     def _aggregated(self, masked=False):
         chunk_handler = self.chunk_handler(masked=masked)
         chunk_handler.bootstrap()
-        _process_chunks(self._array, chunk_handler.add_chunk, masked)
+        engine.process_chunks(self._array, chunk_handler.add_chunk, masked)
         return chunk_handler.result()
 
     def ndarray(self):
@@ -1082,44 +1162,6 @@ def sub(a, b):
 
     """
     return _Elementwise(a, b, np.subtract, np.ma.subtract)
-
-
-def _process_chunks(array, chunk_handler, masked=False):
-    #   chunk_size = 2      => 54s ~ 115% CPU
-    #   chunk_size = 10     => 42s ~ 105% CPU (quicker than CDO!)
-    #   chunk_size = 100    => 54s
-    #   chunk_size = 1000   => 63s
-    size = array.shape[0]
-    chunk_size = 10
-    chunks = Queue.Queue(maxsize=3)
-
-    def worker():
-        while True:
-            chunk = chunks.get()
-            chunk_handler(chunk)
-            chunks.task_done()
-
-    thread = threading.Thread(target=worker)
-    thread.daemon = True
-    thread.start()
-
-    for i in range(1, size, chunk_size):
-        chunk = array[i:i + chunk_size]
-        chunk = chunk.masked_array() if masked else chunk.ndarray()
-        chunks.put(chunk)
-
-    chunks.join()
-
-
-def _process_chunks_simple(array, chunk_handler, masked=False):
-    # Simple, single-threaded version for debugging.
-    size = array.shape[0]
-    chunk_size = 10
-
-    for i in range(1, size, chunk_size):
-        chunk = array[i:i + chunk_size]
-        chunk = chunk.masked_array() if masked else chunk.ndarray()
-        chunk_handler(chunk)
 
 
 # TODO: Test
