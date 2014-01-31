@@ -86,7 +86,7 @@ class TestNumpyArrayAdapter(unittest.TestCase):
             expected = nfunc(data, axis=0, ddof=ddof)
             if expected.ndim == 0:
                 expected = np.asarray(expected)
-            np.testing.assert_array_equal(result, expected)
+            np.testing.assert_array_almost_equal(result, expected)
 
     def test_flat_int(self):
         for ddof in range(2):
@@ -107,17 +107,11 @@ class TestNumpyArrayAdapter(unittest.TestCase):
 
 class TestNumpyArrayAdapterMasked(unittest.TestCase):
     def _check(self, data):
-        print data
         array = biggus.NumpyArrayAdapter(data)
         result = std(array, axis=0, ddof=0).masked_array()
         expected = ma.std(data, axis=0, ddof=0)
         if expected.ndim == 0:
             expected = ma.asarray(expected)
-        print data
-        print 'expected'
-        print expected
-        print 'result'
-        print result
         np.testing.assert_array_equal(result.filled(), expected.filled())
         np.testing.assert_array_equal(result.mask, expected.mask)
 
@@ -142,9 +136,6 @@ class TestNumpyArrayAdapterMasked(unittest.TestCase):
             data = ma.arange(12, dtype=dtype)
             data[::2] = ma.masked
             self._check(data.reshape(3, 4))
-
-        
-
 
 
 if __name__ == '__main__':
