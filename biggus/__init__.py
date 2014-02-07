@@ -59,7 +59,7 @@ import numpy as np
 import numpy.ma as ma
 
 
-__version__ = '0.4.x'
+__version__ = '0.4.0'
 
 
 class Array(object):
