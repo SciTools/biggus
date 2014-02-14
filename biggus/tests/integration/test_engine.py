@@ -30,15 +30,11 @@ class Test(unittest.TestCase):
         chunk_handler_class = mock.Mock(return_value=chunk_handler)
         array = biggus._Aggregation(mock.sentinel.array, mock.sentinel.axis,
                                     chunk_handler_class, {})
-        engine = mock.Mock()
-        default_engine = biggus.engine
-        try:
-            biggus.engine = engine
+        with mock.patch('biggus.engine') as engine:
             array.ndarray()
-            engine.process_chunks.assert_called_once_with(
-                mock.sentinel.array, chunk_handler.add_chunk, False)
-        finally:
-            biggus.engine = default_engine
+        engine.process_chunks.assert_called_once_with(mock.sentinel.array,
+                                                      chunk_handler.add_chunk,
+                                                      False)
 
 
 if __name__ == '__main__':

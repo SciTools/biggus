@@ -107,10 +107,6 @@ class ThreadedEngine(object):
 
     """
     def process_chunks(self, array, chunk_handler, masked=False):
-        #   chunk_size = 2      => 54s ~ 115% CPU
-        #   chunk_size = 10     => 42s ~ 105% CPU (quicker than CDO!)
-        #   chunk_size = 100    => 54s
-        #   chunk_size = 1000   => 63s
         size = array.shape[0]
         chunk_size = 10
         chunks = Queue.Queue(maxsize=3)
