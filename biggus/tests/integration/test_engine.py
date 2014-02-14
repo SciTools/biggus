@@ -26,15 +26,13 @@ import biggus
 class Test(unittest.TestCase):
     def test(self):
         # If we switch evaluation engine, does it get used?
-        chunk_handler = mock.Mock(name='chunk_handler')
-        chunk_handler_class = mock.Mock(return_value=chunk_handler)
-        array = biggus._Aggregation(mock.sentinel.array, mock.sentinel.axis,
-                                    chunk_handler_class, {})
-        with mock.patch('biggus.engine') as engine:
-            array.ndarray()
-        engine.process_chunks.assert_called_once_with(mock.sentinel.array,
-                                                      chunk_handler.add_chunk,
-                                                      False)
+        array = biggus._Aggregation(mock.sentinel.array, None, None, None,
+                                    None, {})
+        return_value = (mock.sentinel.result,)
+        engine = mock.Mock(**{'ndarrays.return_value': return_value})
+        with mock.patch('biggus.engine', engine):
+            result = array.ndarray()
+        self.assertIs(result, mock.sentinel.result)
 
 
 if __name__ == '__main__':

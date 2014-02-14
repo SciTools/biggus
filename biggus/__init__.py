@@ -71,11 +71,28 @@ class Engine(object):
     __metaclass__ = ABCMeta
 
     @abstractmethod
-    def process_chunks(self, array, chunk_handler, masked=False):
-        # NB. This is a simple interface just to get things started.
-        # Eventually it'd probably be more like:
-        #   engine.compute(list_of_arrays)
-        pass
+    def masked_arrays(self, *arrays):
+        """
+        Return a list of MaskedArray objects corresponding to the given
+        biggus Array objects.
+
+        This can be more efficient (and hence faster) than converting the
+        individual arrays one by one.
+
+        """
+        return [array.masked_array() for array in arrays]
+
+    @abstractmethod
+    def ndarrays(self, *arrays):
+        """
+        Return a list of NumPy ndarray objects corresponding to the given
+        biggus Array objects.
+
+        This can be more efficient (and hence faster) than converting the
+        individual arrays one by one.
+
+        """
+        return [array.ndarray() for array in arrays]
 
 
 class SimpleEngine(Engine):
@@ -86,18 +103,58 @@ class SimpleEngine(Engine):
     engine is particularly convenient for debugging.
 
     """
-    def process_chunks(self, array, chunk_handler, masked=False):
+    def ndarrays(self, *arrays):
+        return self._convert_arrays(arrays, False)
+
+    def masked_arrays(self, *arrays):
+        return self._convert_arrays(arrays, True)
+
+    def _convert_arrays(self, arrays, masked):
+        # Group the given Arrays by their sources.
+        computed_pairs_groups = {}
+        simple_pairs = []
+        for i, array in enumerate(arrays):
+            sources = getattr(array, 'sources', ())
+            pair = (i, array)
+            if sources:
+                source_ids = tuple(id(source) for source in sources)
+                pairs = computed_pairs_groups.setdefault(source_ids, [])
+                pairs.append(pair)
+            else:
+                simple_pairs.append(pair)
+        # Compile the results.
+        all_results = [None] * len(arrays)
+        for i, array in simple_pairs:
+            all_results[i] = array.ndarray()
+        for pairs in computed_pairs_groups.itervalues():
+            indices, arrays = zip(*pairs)
+            results = self._ndarrays_common_sources(arrays, masked=masked)
+            for i, ndarray in zip(indices, results):
+                all_results[i] = ndarray
+        return all_results
+
+    def _ndarrays_common_sources(self, arrays, masked):
+        chunks_handlers = [array.chunks_handler(masked) for array in arrays]
+        for chunks_handler in chunks_handlers:
+            chunks_handler.bootstrap()
+
         # Simple, single-threaded version for debugging.
-        size = array.shape[0]
+        source_arrays = arrays[0].sources
+        size = source_arrays[0].shape[0]
         chunk_size = 10
+        for i in range(0, size, chunk_size):
+            chunks = [array[i:i + chunk_size] for array in source_arrays]
+            chunks = [chunk.masked_array() if masked else chunk.ndarray()
+                      for chunk in chunks]
+            for chunks_handler in chunks_handlers:
+                chunks_handler.process_chunks(chunks)
 
-        for i in range(1, size, chunk_size):
-            chunk = array[i:i + chunk_size]
-            chunk = chunk.masked_array() if masked else chunk.ndarray()
-            chunk_handler(chunk)
+        results = [chunks_handler.result()
+                   for chunks_handler in chunks_handlers]
+        return results
 
 
-class ThreadedEngine(object):
+class ThreadedEngine(SimpleEngine):
     """
     A multi-threaded evaluation engine.
 
@@ -106,27 +163,39 @@ class ThreadedEngine(object):
     calculations.
 
     """
-    def process_chunks(self, array, chunk_handler, masked=False):
-        size = array.shape[0]
+    def _ndarrays_common_sources(self, arrays, masked):
+        chunks_handlers = [array.chunks_handler(masked) for array in arrays]
+        for chunks_handler in chunks_handlers:
+            chunks_handler.bootstrap()
+
+        # Simple, single-threaded version for debugging.
+        source_arrays = arrays[0].sources
+        size = source_arrays[0].shape[0]
         chunk_size = 10
-        chunks = Queue.Queue(maxsize=3)
+        chunks_queue = Queue.Queue(maxsize=3)
 
         def worker():
             while True:
-                chunk = chunks.get()
-                chunk_handler(chunk)
-                chunks.task_done()
+                chunks = chunks_queue.get()
+                for chunks_handler in chunks_handlers:
+                    chunks_handler.process_chunks(chunks)
+                chunks_queue.task_done()
 
         thread = threading.Thread(target=worker)
         thread.daemon = True
         thread.start()
 
-        for i in range(1, size, chunk_size):
-            chunk = array[i:i + chunk_size]
-            chunk = chunk.masked_array() if masked else chunk.ndarray()
-            chunks.put(chunk)
+        for i in range(0, size, chunk_size):
+            chunks = [array[i:i + chunk_size] for array in source_arrays]
+            chunks = [chunk.masked_array() if masked else chunk.ndarray()
+                      for chunk in chunks]
+            chunks_queue.put(chunks)
 
-        chunks.join()
+        chunks_queue.join()
+
+        results = [chunks_handler.result()
+                   for chunks_handler in chunks_handlers]
+        return results
 
 
 engine = ThreadedEngine()
@@ -145,18 +214,6 @@ class Array(object):
 
     """
     __metaclass__ = ABCMeta
-
-    @staticmethod
-    def ndarrays(arrays):
-        """
-        Return a list of NumPy ndarray objects corresponding to the given
-        biggus Array objects.
-
-        Subclasses may override this method to provide more efficient
-        implementations for their instances.
-
-        """
-        return [array.ndarray() for array in arrays]
 
     __hash__ = None
 
@@ -685,20 +742,7 @@ def ndarrays(arrays):
     individual arrays one by one.
 
     """
-    # Group the given Arrays by their static ndarrays() methods.
-    index_array_pairs_by_func = {}
-    for i, array in enumerate(arrays):
-        index_array_pairs = index_array_pairs_by_func.setdefault(
-            array.ndarrays, [])
-        index_array_pairs.append((i, array))
-    # Call each static ndarrays() method and compile the results.
-    all_results = [None] * len(arrays)
-    for func, index_array_pairs in index_array_pairs_by_func.iteritems():
-        indices = [index for index, array in index_array_pairs]
-        results = func([array for index, array in index_array_pairs])
-        for i, ndarray in zip(indices, results):
-            all_results[i] = ndarray
-    return all_results
+    return engine.ndarrays(*arrays)
 
 
 MAX_CHUNK_SIZE = 1024 * 1024
@@ -752,91 +796,77 @@ def save(sources, targets):
         target[keys] = array[keys].ndarray()
 
 
-class _ChunkHandler(object):
+class _ChunksHandler(object):
     __metaclass__ = ABCMeta
 
-    def __init__(self, array, axis, kwargs, masked=False):
+    @abstractmethod
+    def bootstrap(self):
+        pass
+
+    @abstractmethod
+    def process_chunks(self, chunks):
+        pass
+
+    @abstractmethod
+    def result(self):
+        pass
+
+
+class _MeanChunksHandler(_ChunksHandler):
+    def __init__(self, array, axis):
         self.array = array
         self.axis = axis
-        self.kwargs = kwargs
-        self.masked = masked
-        self._mod = ma if self.masked else np
-
-    @abstractmethod
-    def bootstrap(self):
-        pass
-
-    @abstractmethod
-    def add_chunk(self, chunk):
-        pass
-
-    @abstractmethod
-    def result(self):
-        pass
-
-    @abstractproperty
-    def dtype(self):
-        pass
-
-    def _bootstrap_mask(self, mask, shape):
-        if mask.shape:
-            self.running_count = np.asarray(~mask, dtype=self.dtype)
-        else:
-            self.running_count = np.zeros(shape, dtype=self.dtype)
-            if not mask:
-                self.running_count += 1
-
-
-class _Mean(_ChunkHandler):
-    def __init__(self, array, axis, kwargs, masked=False):
-        _ChunkHandler.__init__(self, array, axis, kwargs, masked=masked)
-        # Calculate the equivalent dtype of the result.
-        self._dtype = (np.array([0], dtype=self.array.dtype) / 1.).dtype
 
     def bootstrap(self):
-        first_slice = self.array[0]
-        shape = first_slice.shape
-        self.running_total = np.zeros(shape, dtype=self.dtype)
+        # XXX assumes axis == 0
+        shape = self.array.shape[1:]
+        dtype = self.array.dtype
+        self.running_total = np.zeros(shape, dtype=dtype)
+        self.temp = np.empty(shape, dtype=dtype)
 
-        if self.masked:
-            first_slice = first_slice.masked_array()
-            self.temp = ma.empty(shape, dtype=self.dtype)
-            self.running_total += first_slice.filled(0)
-            self._bootstrap_mask(first_slice.mask, shape)
-        else:
-            first_slice = first_slice.ndarray()
-            self.temp = np.empty(shape, dtype=self.dtype)
-            self.running_total += first_slice
-
-    def add_chunk(self, chunk):
-        if self.masked:
-            ma.sum(chunk, axis=self.axis, out=self.temp)
-            self.running_total += self.temp.filled(0)
-            self.running_count += ma.count(chunk, axis=self.axis)
-        else:
-            np.sum(chunk, axis=self.axis, out=self.temp)
-            self.running_total += self.temp
+    def process_chunks(self, chunks):
+        chunk, = chunks
+        np.sum(chunk, axis=self.axis, out=self.temp)
+        self.running_total += self.temp
 
     def result(self):
-        if self.masked:
-            # Avoid any runtime-warning for divide by zero.
-            mask = self.running_count == 0
-            denominator = ma.array(self.running_count, mask=mask)
-            array = ma.array(self.running_total, mask=mask) / denominator
-        else:
-            array = self.running_total / self.array.shape[0]
-
+        array = self.running_total / float(self.array.shape[0])
         # Promote array-scalar to 0-dimensional array.
         if array.ndim == 0:
-            array = self._mod.array(array)
+            array = np.array(array)
         return array
 
-    @property
-    def dtype(self):
-        return self._dtype
+
+class _MeanMaskedChunksHandler(_ChunksHandler):
+    def __init__(self, array, axis):
+        self.array = array
+        self.axis = axis
+
+    def bootstrap(self):
+        shape = self.array.shape[1:]
+        dtype = self.array.dtype
+        self.running_total = np.zeros(shape, dtype=dtype)
+        self.running_count = np.zeros(shape, dtype=dtype)
+        self.temp = np.ma.empty(shape, dtype=dtype)
+
+    def process_chunks(self, chunks):
+        chunk, = chunks
+        np.ma.sum(chunk, axis=self.axis, out=self.temp)
+        self.running_total += self.temp.filled(0)
+        self.running_count += np.ma.count(chunk, axis=self.axis)
+
+    def result(self):
+        # Avoid any runtime-warning for divide by zero.
+        mask = self.running_count == 0
+        denominator = np.ma.array(self.running_count, mask=mask, dtype=float)
+        array = np.ma.array(self.running_total, mask=mask) / denominator
+        # Promote array-scalar to 0-dimensional array.
+        if array.ndim == 0:
+            array = np.ma.array(array)
+        return array
 
 
-class _Std(_ChunkHandler):
+class _StdChunksHandler(_ChunksHandler):
     # The algorithm used here preserves numerical accuracy whilst only
     # requiring a single pass, and is taken from:
     # Welford, BP (August 1962). "Note on a Method for Calculating
@@ -844,139 +874,135 @@ class _Std(_ChunkHandler):
     # Technometrics 4 (3): 419-420.
     # http://zach.in.tu-clausthal.de/teaching/info_literatur/Welford.pdf
 
-    def __init__(self, array, axis, kwargs, masked=False):
-        _ChunkHandler.__init__(self, array, axis, kwargs, masked=masked)
-        # Calculate the equivalent dtype of the result.
-        self._dtype = (np.array([0], dtype=self.array.dtype) / 1.).dtype
+    def __init__(self, array, axis, ddof):
+        self.array = array
+        self.axis = axis
+        self.ddof = ddof
 
     def bootstrap(self):
-        first_slice = self.array[0]
-        shape = first_slice.shape
+        self.k = 1
+        shape = self.array.shape[1:]
+        dtype = (np.zeros(1, dtype=self.array.dtype) / 1.).dtype
+        self.q = np.zeros(shape, dtype=dtype)
+        self.temp = np.empty(shape, dtype=dtype)
 
-        if self.masked:
-            first_slice = first_slice.masked_array().flatten()
-            self.a = first_slice.filled(0).astype(self.dtype)
-            self.q = np.zeros(shape, dtype=self.dtype).flatten()
-            self._bootstrap_mask(first_slice.mask, shape)
-            self.running_count = self.running_count.flatten()
-        else:
-            self.k = 1
-            first_slice = first_slice.ndarray()
-            self.a = np.array(first_slice, dtype=self.dtype)
-            self.q = np.zeros_like(first_slice, dtype=self.dtype)
-            self.temp = np.empty_like(first_slice, dtype=self.dtype)
+    def process_chunks(self, chunks):
+        chunk, = chunks
 
-    def add_chunk(self, chunk):
+        if self.k == 1:
+            self.a = chunk[0].copy()
+            chunk = chunk[1:]
+
         for chunk_slice in chunk:
-            if self.masked:
-                chunk_slice = chunk_slice.flatten()
-                bootstrapped = self.running_count != 0
-                have_data = ~ma.getmaskarray(chunk_slice)
-                chunk_data = ma.array(chunk_slice).filled(0)
+            self.k += 1
 
-                # Bootstrap a(k) where necessary.
-                self.a[~bootstrapped] = chunk_data[~bootstrapped]
+            # Compute a(k).
+            np.subtract(chunk_slice, self.a, out=self.temp)
+            self.temp *= 1. / self.k
+            self.a += self.temp
 
-                self.running_count += have_data
-
-                # Compute a(k).
-                do_stuff = bootstrapped & have_data
-                temp = ((chunk_data[do_stuff] - self.a[do_stuff]) /
-                        self.running_count[do_stuff])
-                self.a[do_stuff] += temp
-
-                # Compute q(k).
-                temp *= temp
-                temp *= (self.running_count[do_stuff] *
-                         (self.running_count[do_stuff] - 1))
-                self.q[do_stuff] += temp
-            else:
-                self.k += 1
-
-                # Compute a(k).
-                self._mod.subtract(chunk_slice, self.a, out=self.temp)
-                self.temp *= 1. / self.k
-                self.a += self.temp
-
-                # Compute q(k).
-                self.temp *= self.temp
-                self.temp *= self.k * (self.k - 1)
-                self.q += self.temp
+            # Compute q(k).
+            self.temp *= self.temp
+            self.temp *= self.k * (self.k - 1)
+            self.q += self.temp
 
     def result(self):
-        ddof = self.kwargs['ddof']
-        if self.masked:
-            mask = self.running_count == 0
-            denominator = ma.array(self.running_count, mask=mask) - ddof
-            q = ma.array(self.q, mask=mask) / denominator
-            result = ma.sqrt(q)
-            result.shape = self.array[0].shape
-        else:
-            self.q /= (self.k - ddof)
-            result = np.sqrt(self.q)
+        self.q /= (self.k - self.ddof)
+        result = np.sqrt(self.q)
         # Promote array-scalar to 0-dimensional array.
         if result.ndim == 0:
-            result = self._mod.array(result)
+            result = np.array(result)
         return result
 
-    @property
-    def dtype(self):
-        return self._dtype
 
+class _StdMaskedChunksHandler(_ChunksHandler):
+    # The algorithm used here preserves numerical accuracy whilst only
+    # requiring a single pass, and is taken from:
+    # Welford, BP (August 1962). "Note on a Method for Calculating
+    # Corrected Sums of Squares and Products".
+    # Technometrics 4 (3): 419-420.
+    # http://zach.in.tu-clausthal.de/teaching/info_literatur/Welford.pdf
 
-class _Var(_Std):
+    def __init__(self, array, axis, ddof):
+        self.array = array
+        self.axis = axis
+        self.ddof = ddof
+
+    def bootstrap(self):
+        shape = self.array.shape[1:]
+        dtype = (np.zeros(1, dtype=self.array.dtype) / 1.).dtype
+        self.a = np.zeros(shape, dtype=dtype).flatten()
+        self.q = np.zeros(shape, dtype=dtype).flatten()
+        self.running_count = np.zeros(shape, dtype=dtype).flatten()
+
+    def process_chunks(self, chunks):
+        chunk, = chunks
+        for chunk_slice in chunk:
+            chunk_slice = chunk_slice.flatten()
+            bootstrapped = self.running_count != 0
+            have_data = ~ma.getmaskarray(chunk_slice)
+            chunk_data = ma.array(chunk_slice).filled(0)
+
+            # Bootstrap a(k) where necessary.
+            self.a[~bootstrapped] = chunk_data[~bootstrapped]
+
+            self.running_count += have_data
+
+            # Compute a(k).
+            do_stuff = bootstrapped & have_data
+            temp = ((chunk_data[do_stuff] - self.a[do_stuff]) /
+                    self.running_count[do_stuff])
+            self.a[do_stuff] += temp
+
+            # Compute q(k).
+            temp *= temp
+            temp *= (self.running_count[do_stuff] *
+                     (self.running_count[do_stuff] - 1))
+            self.q[do_stuff] += temp
+
     def result(self):
-        result = _Std.result(self)
+        mask = self.running_count == 0
+        denominator = ma.array(self.running_count, mask=mask) - self.ddof
+        q = ma.array(self.q, mask=mask) / denominator
+        result = ma.sqrt(q)
+        result.shape = self.array[0].shape
+        # Promote array-scalar to 0-dimensional array.
+        if result.ndim == 0:
+            result = np.ma.array(result)
+        return result
+
+
+class _VarChunksHandler(_StdChunksHandler):
+    def result(self):
+        result = super(_VarChunksHandler, self).result()
         return result * result
 
 
-class _Aggregation(Array):
-    @staticmethod
-    def ndarrays(arrays):
-        """
-        Return a list of NumPy ndarray objects corresponding to the given
-        biggus _Aggregation objects.
+class _VarMaskedChunksHandler(_StdMaskedChunksHandler):
+    def result(self):
+        result = super(_VarMaskedChunksHandler, self).result()
+        return result * result
 
-        """
-        assert all(isinstance(array, _Aggregation) for array in arrays)
 
-        # Group the given Arrays by their sources.
-        index_array_pairs_by_source = {}
-        for i, array in enumerate(arrays):
-            index_array_pairs = index_array_pairs_by_source.setdefault(
-                id(array._array), [])
-            index_array_pairs.append((i, array))
-        all_results = [None] * len(arrays)
-        for index_array_pairs in index_array_pairs_by_source.itervalues():
-            indices = [index for index, array in index_array_pairs]
-            arrays = [array for index, array in index_array_pairs]
-            results = _Aggregation._ndarrays_common_source(arrays)
-            for i, ndarray in zip(indices, results):
-                all_results[i] = ndarray
-        return all_results
+class ComputedArray(Array):
+    @abstractproperty
+    def sources(self):
+        """The tuple of Array instances from which the result is computed."""
 
-    @staticmethod
-    def _ndarrays_common_source(arrays):
-        chunk_handlers = [array.chunk_handler() for array in arrays]
-        for chunk_handler in chunk_handlers:
-            chunk_handler.bootstrap()
+    @abstractmethod
+    def chunks_handler(self, masked):
+        """Return a ChunksHandler which can compute the result."""
 
-        def meta_chunk_handler(chunk):
-            for chunk_handler in chunk_handlers:
-                chunk_handler.add_chunk(chunk)
 
-        src_array = arrays[0]._array
-        engine.process_chunks(src_array, meta_chunk_handler)
-
-        results = [chunk_handler.result() for chunk_handler in chunk_handlers]
-        return results
-
-    def __init__(self, array, axis, chunk_handler_class, kwargs):
+class _Aggregation(ComputedArray):
+    def __init__(self, array, axis, chunks_handler_class,
+                 masked_chunks_handler_class, dtype, kwargs):
         self._array = array
         self._axis = axis
-        self._chunk_handler_class = chunk_handler_class
+        self._chunks_handler_class = chunks_handler_class
+        self._masked_chunks_handler_class = masked_chunks_handler_class
+        self._dtype = dtype
         self._kwargs = kwargs
-        self._dtype = self.chunk_handler().dtype
 
     @property
     def dtype(self):
@@ -988,29 +1014,36 @@ class _Aggregation(Array):
         del shape[self._axis]
         return tuple(shape)
 
+    @property
+    def sources(self):
+        return (self._array,)
+
     def __getitem__(self, keys):
         assert self._axis == 0
         if not isinstance(keys, tuple):
             keys = (keys,)
         keys = (slice(None),) + keys
         return _Aggregation(self._array[keys], self._axis,
-                            self._chunk_handler_class, self._kwargs)
-
-    def _aggregated(self, masked=False):
-        chunk_handler = self.chunk_handler(masked=masked)
-        chunk_handler.bootstrap()
-        engine.process_chunks(self._array, chunk_handler.add_chunk, masked)
-        return chunk_handler.result()
+                            self._chunks_handler_class,
+                            self._masked_chunks_handler_class,
+                            self.dtype,
+                            self._kwargs)
 
     def ndarray(self):
-        return self._aggregated(masked=False)
+        result, = engine.ndarrays(self)
+        return result
 
     def masked_array(self):
-        return self._aggregated(masked=True)
+        result, = engine.masked_arrays(self)
+        return result
 
-    def chunk_handler(self, masked=False):
-        return self._chunk_handler_class(self._array, self._axis,
-                                         self._kwargs, masked=masked)
+    def chunks_handler(self, masked):
+        if masked:
+            handler_class = self._masked_chunks_handler_class
+        else:
+            handler_class = self._chunks_handler_class
+        source, = self.sources
+        return handler_class(source, self._axis, **self._kwargs)
 
 
 def _normalise_axis(axis):
@@ -1049,7 +1082,9 @@ def mean(a, axis=None):
     """
     axes = _normalise_axis(axis)
     assert axes == (0,)
-    return _Aggregation(a, axes[0], _Mean, {})
+    dtype = (np.array([0], dtype=a.dtype) / 1.).dtype
+    return _Aggregation(a, axes[0], _MeanChunksHandler,
+                        _MeanMaskedChunksHandler, dtype, {})
 
 
 def std(a, axis=None, ddof=0):
@@ -1075,7 +1110,9 @@ def std(a, axis=None, ddof=0):
     """
     axes = _normalise_axis(axis)
     assert axes == (0,)
-    return _Aggregation(a, axes[0], _Std, dict(ddof=ddof))
+    dtype = (np.array([0], dtype=a.dtype) / 1.).dtype
+    return _Aggregation(a, axes[0], _StdChunksHandler,
+                        _StdMaskedChunksHandler, dtype, dict(ddof=ddof))
 
 
 def var(a, axis=None, ddof=0):
@@ -1101,10 +1138,32 @@ def var(a, axis=None, ddof=0):
     """
     axes = _normalise_axis(axis)
     assert axes == (0,)
-    return _Aggregation(a, axes[0], _Var, dict(ddof=ddof))
+    dtype = (np.array([0], dtype=a.dtype) / 1.).dtype
+    return _Aggregation(a, axes[0], _VarChunksHandler,
+                        _VarMaskedChunksHandler, dtype, dict(ddof=ddof))
 
 
-class _Elementwise(Array):
+class _ElementwiseChunksHandler(_ChunksHandler):
+    def __init__(self, sources, operator):
+        self.sources = sources
+        self.operator = operator
+
+    def bootstrap(self):
+        # TODO: np vs ma
+        self.concrete = np.empty(self.sources[0].shape)
+        self.i = 0
+
+    def process_chunks(self, chunks):
+        # XXX Assumes axis=0 traversal
+        n = chunks[0].shape[0]
+        self.concrete[self.i:self.i + n] = self.operator(*chunks)
+        self.i += n
+
+    def result(self):
+        return self.concrete
+
+
+class _Elementwise(ComputedArray):
     def __init__(self, array1, array2, numpy_op, ma_op):
         # TODO: Broadcasting
         assert array1.shape == array2.shape
@@ -1123,6 +1182,10 @@ class _Elementwise(Array):
     def shape(self):
         return self._array1.shape
 
+    @property
+    def sources(self):
+        return (self._array1, self._array2)
+
     def __getitem__(self, keys):
         if not isinstance(keys, tuple):
             keys = (keys,)
@@ -1134,6 +1197,13 @@ class _Elementwise(Array):
         np_operands = ndarrays(operands)
         result = op(*np_operands)
         return result
+
+    def chunks_handler(self, masked):
+        if masked:
+            operator = self._ma_op
+        else:
+            operator = self._numpy_op
+        return _ElementwiseChunksHandler(self.sources, operator)
 
     def ndarray(self):
         result = self._calc(self._numpy_op)
