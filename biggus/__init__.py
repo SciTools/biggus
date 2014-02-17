@@ -198,11 +198,212 @@ class ThreadedEngine(SimpleEngine):
         return results
 
 
-engine = ThreadedEngine()
+Chunk = collections.namedtuple('Chunk', 'keys data')
+
+
+QUEUE_POISON = None
+
+
+class Node(object):
+    def __init__(self):
+        self.output_queues = []
+
+    def add_output_queue(self, output_queue):
+        self.output_queues.append(output_queue)
+
+    def thread(self):
+        thread = threading.Thread(target=self.run, name=str(self))
+        thread.daemon = True
+        thread.start()
+        return thread
+
+
+class ProducerNode(Node):
+    def __init__(self, array, iteration_order, masked):
+        assert array.ndim == len(iteration_order)
+        self.array = array
+        self.iteration_order = iteration_order
+        self.masked = masked
+        super(ProducerNode, self).__init__()
+
+    def all_cuts(self):
+        shape = self.array.shape
+        return _all_slices_inner(self.array.dtype.itemsize, shape,
+                                 always_slices=True)
+
+    def run(self):
+        try:
+            all_cuts = self.all_cuts()
+            all_cuts = [all_cuts[i] for i in self.iteration_order]
+            cut_shape = tuple(len(cuts) for cuts in all_cuts)
+            inverse_order = [self.iteration_order.index(i) for
+                             i in range(len(self.iteration_order))]
+            for cut_indices in np.ndindex(*cut_shape):
+                key = tuple(cuts[i] for cuts, i in zip(all_cuts, cut_indices))
+                key = tuple(key[i] for i in inverse_order)
+                if self.masked:
+                    data = self.array[key].masked_array()
+                else:
+                    data = self.array[key].ndarray()
+                output_chunk = Chunk(key, data)
+                for queue in self.output_queues:
+                    queue.put(output_chunk)
+        finally:
+            for queue in self.output_queues:
+                queue.put(QUEUE_POISON)
+
+
+class ConsumerNode(Node):
+    __metaclass__ = ABCMeta
+
+    def __init__(self):
+        self.input_queues = []
+        super(ConsumerNode, self).__init__()
+
+    def add_input_nodes(self, input_nodes):
+        self.input_queues = [Queue.Queue(maxsize=3) for _ in input_nodes]
+        for input_node, input_queue in zip(input_nodes, self.input_queues):
+            input_node.add_output_queue(input_queue)
+
+    @abstractmethod
+    def finalise(self):
+        pass
+
+    def output(self, chunk):
+        if chunk is not None:
+            for queue in self.output_queues:
+                queue.put(chunk)
+
+    @abstractmethod
+    def process_chunks(self, chunks):
+        pass
+
+    def run(self):
+        try:
+            while True:
+                input_chunks = [input.get() for input in self.input_queues]
+                for input in self.input_queues:
+                    input.task_done()
+                if any(chunk is QUEUE_POISON for chunk in input_chunks):
+                    break
+                self.output(self.process_chunks(input_chunks))
+            self.output(self.finalise())
+        finally:
+            for queue in self.output_queues:
+                queue.put(QUEUE_POISON)
+
+
+class StreamsHandlerNode(ConsumerNode):
+    def __init__(self, array, streams_handler):
+        self.array = array
+        self.streams_handler = streams_handler
+        super(StreamsHandlerNode, self).__init__()
+
+    def finalise(self):
+        return self.streams_handler.finalise()
+
+    def input_iteration_order(self, iteration_order):
+        return self.streams_handler.input_iteration_order(iteration_order)
+
+    def process_chunks(self, chunks):
+        return self.streams_handler.process_chunks(chunks)
+
+
+class NdarrayNode(ConsumerNode):
+    def __init__(self, array, masked):
+        if masked:
+            self.result = np.ma.empty(array.shape, dtype=array.dtype)
+        else:
+            self.result = np.empty(array.shape, dtype=array.dtype)
+        super(NdarrayNode, self).__init__()
+
+    def finalise(self):
+        pass
+
+    def process_chunks(self, chunks):
+        chunk, = chunks
+        if chunk.keys:
+            self.result[chunk.keys] = chunk.data
+        else:
+            self.result[...] = chunk.data
+
+
+class AllThreadedEngine(Engine):
+    class Group(object):
+        def __init__(self, arrays, indices):
+            self.arrays = arrays
+            self.indices = indices
+            self._node_cache = {}
+
+        def __repr__(self):
+            return 'Group({}, {})'.format(self.arrays, self.indices)
+
+        def _make_node(self, array, iteration_order, masked):
+            cache_key = id(array)
+            node = self._node_cache.get(cache_key, None)
+            if node is None:
+                if hasattr(array, 'streams_handler'):
+                    node = StreamsHandlerNode(array,
+                                              array.streams_handler(masked))
+                    iteration_order = node.input_iteration_order(
+                        iteration_order)
+                    input_nodes = [self._make_node(input_array,
+                                                   iteration_order, masked)
+                                   for input_array in array.sources]
+                    node.add_input_nodes(input_nodes)
+                else:
+                    node = ProducerNode(array, iteration_order, masked)
+                self._node_cache[cache_key] = node
+            return node
+
+        def evaluate(self, masked):
+            # Construct nodes starting from the producers.
+            result_nodes = []
+            result_threads = []
+            for array in self.arrays:
+                iteration_order = range(array.ndim)
+                node = self._make_node(array, iteration_order, masked)
+                result_node = NdarrayNode(array, masked)
+                result_node.add_input_nodes([node])
+                result_threads.append(result_node.thread())
+                result_nodes.append(result_node)
+
+            # Start up all the producer/computation threads.
+            for node in self._node_cache.itervalues():
+                node.thread()
+
+            # Wait for the result threads to finish.
+            for thread in result_threads:
+                thread.join()
+
+            return [node.result for node in result_nodes]
+
+    def _groups(self, arrays):
+        return [self.Group(arrays, range(len(arrays)))]
+
+    def _evaluate(self, arrays, masked):
+        # Figure out which arrays should be evaluated in parallel.
+        groups = self._groups(arrays)
+        # Compile the results.
+        all_results = [None] * len(arrays)
+        for group in groups:
+            ndarrays = group.evaluate(masked)
+            for i, ndarray in zip(group.indices, ndarrays):
+                all_results[i] = ndarray
+        return all_results
+
+    def masked_arrays(self, *arrays):
+        return self._evaluate(arrays, True)
+
+    def ndarrays(self, *arrays):
+        return self._evaluate(arrays, False)
+
+
+engine = AllThreadedEngine()
 """
 The current lazy evaluation engine.
 
-Defaults to an instance of :class:`ThreadedEngine`.
+Defaults to an instance of :class:`AllThreadedEngine`.
 
 """
 
@@ -745,23 +946,30 @@ def ndarrays(arrays):
     return engine.ndarrays(*arrays)
 
 
-MAX_CHUNK_SIZE = 1024 * 1024
+MAX_CHUNK_SIZE = 8 * 1024 * 1024
 
 
 def _all_slices(array):
+    return _all_slices_inner(array.dtype.itemsize, array.shape)
+
+
+def _all_slices_inner(item_size, shape, always_slices=False):
     # Return the slices for each dimension which ensure complete
     # coverage by chunks no larger than MAX_CHUNK_SIZE.
     # e.g. For a float32 array of shape (100, 768, 1024) the slices are:
     #   (0, 1, 2, ..., 99),
     #   (slice(0, 256), slice(256, 512), slice(512, 768)),
     #   (slice(None)
-    nbytes = array.dtype.itemsize
+    nbytes = item_size
     all_slices = []
-    for i, size in reversed(list(enumerate(array.shape))):
+    for i, size in reversed(list(enumerate(shape))):
         if size * nbytes <= MAX_CHUNK_SIZE:
             slices = (slice(None),)
         elif nbytes > MAX_CHUNK_SIZE:
-            slices = range(size)
+            if always_slices:
+                slices = [slice(i, i + 1) for i in range(size)]
+            else:
+                slices = range(size)
         else:
             step = MAX_CHUNK_SIZE / nbytes
             slices = []
@@ -810,6 +1018,224 @@ class _ChunksHandler(object):
     @abstractmethod
     def result(self):
         pass
+
+
+class _StreamsHandler(object):
+    __metaclass__ = ABCMeta
+
+    @abstractmethod
+    def finalise(self):
+        pass
+
+    @abstractmethod
+    def input_iteration_order(self, iteration_order):
+        pass
+
+    @abstractmethod
+    def process_chunks(self, chunks):
+        pass
+
+
+class _AggregationStreamsHandler(_StreamsHandler):
+    def __init__(self):
+        self.current_keys = None
+
+    @abstractmethod
+    def bootstrap(self, data):
+        pass
+
+    def input_iteration_order(self, iteration_order):
+        order = [i if i < self.axis else i + 1 for i in iteration_order]
+        order.append(self.axis)
+        return order
+
+    def process_chunks(self, chunks):
+        chunk, = chunks
+        keys = list(chunk.keys)
+        del keys[self.axis]
+        result = None
+        if keys != self.current_keys:
+            shape = list(chunk.data.shape)
+            del shape[self.axis]
+            self.current_shape = shape
+            if self.current_keys is not None:
+                result = self.finalise()
+            self.bootstrap(shape)
+            self.current_keys = keys
+        self.process_data(chunk.data)
+        return result
+
+    @abstractmethod
+    def process_data(self, data):
+        pass
+
+
+class _MeanStreamsHandler(_AggregationStreamsHandler):
+    def __init__(self, array, axis):
+        self.array = array
+        self.axis = axis
+        super(_MeanStreamsHandler, self).__init__()
+
+    def bootstrap(self, shape):
+        self.running_total = np.zeros(shape, dtype=self.array.dtype)
+
+    def finalise(self):
+        array = self.running_total / float(self.array.shape[self.axis])
+        # Promote array-scalar to 0-dimensional array.
+        if array.ndim == 0:
+            array = np.array(array)
+        chunk = Chunk(self.current_keys, array)
+        return chunk
+
+    def process_data(self, data):
+        self.running_total += np.sum(data, axis=self.axis)
+
+
+class _MeanMaskedStreamsHandler(_AggregationStreamsHandler):
+    def __init__(self, array, axis):
+        self.array = array
+        self.axis = axis
+        super(_MeanMaskedStreamsHandler, self).__init__()
+
+    def bootstrap(self, shape):
+        self.running_count = np.zeros(shape, dtype=self.array.dtype)
+        self.running_total = np.zeros(shape, dtype=self.array.dtype)
+
+    def finalise(self):
+        # Avoid any runtime-warning for divide by zero.
+        mask = self.running_count == 0
+        denominator = np.ma.array(self.running_count, mask=mask, dtype=float)
+        array = np.ma.array(self.running_total, mask=mask) / denominator
+        # Promote array-scalar to 0-dimensional array.
+        if array.ndim == 0:
+            array = np.ma.array(array)
+        chunk = Chunk(self.current_keys, array)
+        return chunk
+
+    def process_data(self, data):
+        self.running_count += np.ma.count(data, axis=self.axis)
+        self.running_total += np.sum(data, axis=self.axis)
+
+
+class _StdStreamsHandler(_AggregationStreamsHandler):
+    # The algorithm used here preserves numerical accuracy whilst only
+    # requiring a single pass, and is taken from:
+    # Welford, BP (August 1962). "Note on a Method for Calculating
+    # Corrected Sums of Squares and Products".
+    # Technometrics 4 (3): 419-420.
+    # http://zach.in.tu-clausthal.de/teaching/info_literatur/Welford.pdf
+
+    def __init__(self, array, axis, ddof):
+        self.array = array
+        self.axis = axis
+        self.ddof = ddof
+        super(_StdStreamsHandler, self).__init__()
+
+    def bootstrap(self, shape):
+        self.k = 1
+        dtype = (np.zeros(1, dtype=self.array.dtype) / 1.).dtype
+        self.q = np.zeros(shape, dtype=dtype)
+
+    def finalise(self):
+        self.q /= (self.k - self.ddof)
+        array = np.sqrt(self.q)
+        # Promote array-scalar to 0-dimensional array.
+        if array.ndim == 0:
+            array = np.array(array)
+        chunk = Chunk(self.current_keys, array)
+        return chunk
+
+    def process_data(self, data):
+        data = np.rollaxis(data, self.axis)
+
+        if self.k == 1:
+            self.a = data[0].copy()
+            data = data[1:]
+
+        for data_slice in data:
+            self.k += 1
+
+            # Compute a(k).
+            temp = data_slice - self.a
+            temp *= 1. / self.k
+            self.a += temp
+
+            # Compute q(k).
+            temp *= temp
+            temp *= self.k * (self.k - 1)
+            self.q += temp
+
+
+class _StdMaskedStreamsHandler(_AggregationStreamsHandler):
+    # The algorithm used here preserves numerical accuracy whilst only
+    # requiring a single pass, and is taken from:
+    # Welford, BP (August 1962). "Note on a Method for Calculating
+    # Corrected Sums of Squares and Products".
+    # Technometrics 4 (3): 419-420.
+    # http://zach.in.tu-clausthal.de/teaching/info_literatur/Welford.pdf
+
+    def __init__(self, array, axis, ddof):
+        self.array = array
+        self.axis = axis
+        self.ddof = ddof
+        super(_StdMaskedStreamsHandler, self).__init__()
+
+    def bootstrap(self, shape):
+        dtype = (np.zeros(1, dtype=self.array.dtype) / 1.).dtype
+        self.a = np.zeros(shape, dtype=dtype).flatten()
+        self.q = np.zeros(shape, dtype=dtype).flatten()
+        self.running_count = np.zeros(shape, dtype=dtype).flatten()
+
+    def finalise(self):
+        mask = self.running_count == 0
+        denominator = ma.array(self.running_count, mask=mask) - self.ddof
+        q = ma.array(self.q, mask=mask) / denominator
+        array = ma.sqrt(q)
+        array.shape = self.current_shape
+        # Promote array-scalar to 0-dimensional array.
+        if array.ndim == 0:
+            array = np.ma.array(array)
+        chunk = Chunk(self.current_keys, array)
+        return chunk
+
+    def process_data(self, data):
+        data = np.rollaxis(data, self.axis)
+        for chunk_slice in data:
+            chunk_slice = chunk_slice.flatten()
+            bootstrapped = self.running_count != 0
+            have_data = ~ma.getmaskarray(chunk_slice)
+            chunk_data = ma.array(chunk_slice).filled(0)
+
+            # Bootstrap a(k) where necessary.
+            self.a[~bootstrapped] = chunk_data[~bootstrapped]
+
+            self.running_count += have_data
+
+            # Compute a(k).
+            do_stuff = bootstrapped & have_data
+            temp = ((chunk_data[do_stuff] - self.a[do_stuff]) /
+                    self.running_count[do_stuff])
+            self.a[do_stuff] += temp
+
+            # Compute q(k).
+            temp *= temp
+            temp *= (self.running_count[do_stuff] *
+                     (self.running_count[do_stuff] - 1))
+            self.q[do_stuff] += temp
+
+
+class _VarStreamsHandler(_StdStreamsHandler):
+    def finalise(self):
+        chunk = super(_VarStreamsHandler, self).finalise()
+        chunk = Chunk(chunk.keys, chunk.data * chunk.data)
+        return chunk
+
+
+class _VarMaskedStreamsHandler(_StdMaskedStreamsHandler):
+    def finalise(self):
+        chunk = super(_VarMaskedStreamsHandler, self).finalise()
+        chunk = Chunk(chunk.keys, chunk.data * chunk.data)
+        return chunk
 
 
 class _MeanChunksHandler(_ChunksHandler):
@@ -993,14 +1419,22 @@ class ComputedArray(Array):
     def chunks_handler(self, masked):
         """Return a ChunksHandler which can compute the result."""
 
+    @abstractmethod
+    def streams_handler(self, masked):
+        """Return a StreamsHandler which can compute the result."""
+
 
 class _Aggregation(ComputedArray):
     def __init__(self, array, axis, chunks_handler_class,
-                 masked_chunks_handler_class, dtype, kwargs):
+                 masked_chunks_handler_class,
+                 streams_handler_class, masked_streams_handler_class,
+                 dtype, kwargs):
         self._array = array
         self._axis = axis
         self._chunks_handler_class = chunks_handler_class
         self._masked_chunks_handler_class = masked_chunks_handler_class
+        self._streams_handler_class = streams_handler_class
+        self._masked_streams_handler_class = masked_streams_handler_class
         self._dtype = dtype
         self._kwargs = kwargs
 
@@ -1019,13 +1453,14 @@ class _Aggregation(ComputedArray):
         return (self._array,)
 
     def __getitem__(self, keys):
-        assert self._axis == 0
         if not isinstance(keys, tuple):
             keys = (keys,)
         keys = (slice(None),) + keys
         return _Aggregation(self._array[keys], self._axis,
                             self._chunks_handler_class,
                             self._masked_chunks_handler_class,
+                            self._streams_handler_class,
+                            self._masked_streams_handler_class,
                             self.dtype,
                             self._kwargs)
 
@@ -1042,6 +1477,14 @@ class _Aggregation(ComputedArray):
             handler_class = self._masked_chunks_handler_class
         else:
             handler_class = self._chunks_handler_class
+        source, = self.sources
+        return handler_class(source, self._axis, **self._kwargs)
+
+    def streams_handler(self, masked):
+        if masked:
+            handler_class = self._masked_streams_handler_class
+        else:
+            handler_class = self._streams_handler_class
         source, = self.sources
         return handler_class(source, self._axis, **self._kwargs)
 
@@ -1081,10 +1524,12 @@ def mean(a, axis=None):
 
     """
     axes = _normalise_axis(axis)
-    assert axes == (0,)
+    assert axes is not None and len(axes) == 1
     dtype = (np.array([0], dtype=a.dtype) / 1.).dtype
     return _Aggregation(a, axes[0], _MeanChunksHandler,
-                        _MeanMaskedChunksHandler, dtype, {})
+                        _MeanMaskedChunksHandler, _MeanStreamsHandler,
+                        _MeanMaskedStreamsHandler,
+                        dtype, {})
 
 
 def std(a, axis=None, ddof=0):
@@ -1109,10 +1554,12 @@ def std(a, axis=None, ddof=0):
 
     """
     axes = _normalise_axis(axis)
-    assert axes == (0,)
+    assert axes is not None and len(axes) == 1
     dtype = (np.array([0], dtype=a.dtype) / 1.).dtype
     return _Aggregation(a, axes[0], _StdChunksHandler,
-                        _StdMaskedChunksHandler, dtype, dict(ddof=ddof))
+                        _StdMaskedChunksHandler,
+                        _StdStreamsHandler, _StdMaskedStreamsHandler,
+                        dtype, dict(ddof=ddof))
 
 
 def var(a, axis=None, ddof=0):
@@ -1137,10 +1584,12 @@ def var(a, axis=None, ddof=0):
 
     """
     axes = _normalise_axis(axis)
-    assert axes == (0,)
+    assert axes is not None and len(axes) == 1
     dtype = (np.array([0], dtype=a.dtype) / 1.).dtype
     return _Aggregation(a, axes[0], _VarChunksHandler,
-                        _VarMaskedChunksHandler, dtype, dict(ddof=ddof))
+                        _VarMaskedChunksHandler,
+                        _VarStreamsHandler, _VarMaskedStreamsHandler,
+                        dtype, dict(ddof=ddof))
 
 
 class _ElementwiseChunksHandler(_ChunksHandler):
@@ -1161,6 +1610,23 @@ class _ElementwiseChunksHandler(_ChunksHandler):
 
     def result(self):
         return self.concrete
+
+
+class _ElementwiseStreamsHandler(_StreamsHandler):
+    def __init__(self, sources, operator):
+        self.sources = sources
+        self.operator = operator
+
+    def finalise(self):
+        pass
+
+    def input_iteration_order(self, iteration_order):
+        return iteration_order
+
+    def process_chunks(self, chunks):
+        array = self.operator(*[chunk.data for chunk in chunks])
+        chunk = Chunk(chunks[0].keys, array)
+        return chunk
 
 
 class _Elementwise(ComputedArray):
@@ -1212,6 +1678,13 @@ class _Elementwise(ComputedArray):
     def masked_array(self):
         result = self._calc(self._ma_op)
         return result
+
+    def streams_handler(self, masked):
+        if masked:
+            operator = self._ma_op
+        else:
+            operator = self._numpy_op
+        return _ElementwiseStreamsHandler(self.sources, operator)
 
 
 def add(a, b):
