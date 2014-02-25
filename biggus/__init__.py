@@ -49,6 +49,8 @@ Example:
     mean_error = mean_error.ndarray()
 
 """
+from __future__ import division
+
 from abc import ABCMeta, abstractproperty, abstractmethod
 import collections
 import itertools
@@ -996,7 +998,7 @@ def _all_slices_inner(item_size, shape, always_slices=False):
             else:
                 slices = range(size)
         else:
-            step = MAX_CHUNK_SIZE / nbytes
+            step = MAX_CHUNK_SIZE // nbytes
             slices = []
             for start in range(0, size, step):
                 slices.append(slice(start, start + step))
@@ -1089,7 +1091,7 @@ class _MeanStreamsHandler(_AggregationStreamsHandler):
         self.running_total = np.zeros(shape, dtype=self.array.dtype)
 
     def finalise(self):
-        array = self.running_total / float(self.array.shape[self.axis])
+        array = self.running_total / self.array.shape[self.axis]
         # Promote array-scalar to 0-dimensional array.
         if array.ndim == 0:
             array = np.array(array)
@@ -1166,7 +1168,7 @@ class _StdStreamsHandler(_AggregationStreamsHandler):
 
             # Compute a(k).
             temp = data_slice - self.a
-            temp *= 1. / self.k
+            temp /= self.k
             self.a += temp
 
             # Compute q(k).
