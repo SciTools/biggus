@@ -82,7 +82,7 @@ class Engine(object):
         individual arrays one by one.
 
         """
-        return [array.masked_array() for array in arrays]
+        pass
 
     @abstractmethod
     def ndarrays(self, *arrays):
@@ -94,7 +94,7 @@ class Engine(object):
         individual arrays one by one.
 
         """
-        return [array.ndarray() for array in arrays]
+        pass
 
 
 Chunk = collections.namedtuple('Chunk', 'keys data')
