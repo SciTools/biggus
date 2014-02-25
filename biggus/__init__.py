@@ -268,6 +268,11 @@ class ConsumerNode(Node):
 
 
 class StreamsHandlerNode(ConsumerNode):
+    """
+    A node in an expression graph corresponding to an Array with a
+    `streams_handler` method.
+
+    """
     def __init__(self, array, streams_handler):
         self.array = array
         self.streams_handler = streams_handler
