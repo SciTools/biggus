@@ -156,11 +156,6 @@ class ProducerNode(Node):
         self.masked = masked
         super(ProducerNode, self).__init__()
 
-    def all_cuts(self):
-        shape = self.array.shape
-        return _all_slices_inner(self.array.dtype.itemsize, shape,
-                                 always_slices=True)
-
     def run(self):
         """
         Emit the Chunk instances which cover the underlying Array.
@@ -171,7 +166,17 @@ class ProducerNode(Node):
 
         """
         try:
-            all_cuts = self.all_cuts()
+            # We always slice up the Array into the same chunks, but
+            # the order that we traverse those chunks depends on
+            # `self.iteration_order`.
+            # We use `numpy.ndindex` to iterate through all the chunks,
+            # but since it always iterates over the last dimension first
+            # we have to transpose `all_cuts` and `cut_shape` ourselves.
+            # Then we have to invert the transposition once we have
+            # indentified the relevant slices.
+            all_cuts = _all_slices_inner(self.array.dtype.itemsize,
+                                         self.array.shape,
+                                         always_slices=True)
             all_cuts = [all_cuts[i] for i in self.iteration_order]
             cut_shape = tuple(len(cuts) for cuts in all_cuts)
             inverse_order = [self.iteration_order.index(i) for
@@ -179,6 +184,10 @@ class ProducerNode(Node):
             for cut_indices in np.ndindex(*cut_shape):
                 key = tuple(cuts[i] for cuts, i in zip(all_cuts, cut_indices))
                 key = tuple(key[i] for i in inverse_order)
+                # Now we have the slices that describe the next chunk.
+                # For example, key might be equivalent to `[11:12, 0:3, :, :]`.
+                # Simply "realise" the data for that region and eit it
+                # as a Chunk to all registered output queues.
                 if self.masked:
                     data = self.array[key].masked_array()
                 else:
@@ -220,9 +229,13 @@ class ConsumerNode(Node):
     @abstractmethod
     def finalise(self):
         """
-        Output any remaining partial results.
+        Return any remaining partial results.
 
         Called once all the input chunks have been processed.
+
+        Returns
+        -------
+        Chunk or None
 
         """
         pass
@@ -386,6 +399,8 @@ class AllThreadedEngine(Engine):
             return [node.result for node in result_nodes]
 
     def _groups(self, arrays):
+        # XXX Placeholder implementation which assumes everything
+        # is compatible and can be evaluated in parallel.
         return [self.Group(arrays, range(len(arrays)))]
 
     def _evaluate(self, arrays, masked):
@@ -953,6 +968,9 @@ def ndarrays(arrays):
     return engine.ndarrays(*arrays)
 
 
+#: The maximum number of bytes to allow when processing an array in
+#: "bite-size" chunks. The value has been empirically determined to
+#: provide vaguely near optimal performance under certain conditions.
 MAX_CHUNK_SIZE = 8 * 1024 * 1024
 
 
