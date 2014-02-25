@@ -1319,7 +1319,7 @@ def mean(a, axis=None):
     """
     Request the mean of an Array over any number of axes.
 
-    .. note:: Currently limited to axis=0.
+    .. note:: Currently limited to operating on a single axis.
 
     :param axis: Axis or axes along which the operation is performed.
                  The default (axis=None) is to perform the operation
@@ -1345,7 +1345,7 @@ def std(a, axis=None, ddof=0):
     """
     Request the standard deviation of an Array over any number of axes.
 
-    .. note:: Currently limited to axis=0.
+    .. note:: Currently limited to operating on a single axis.
 
     :param axis: Axis or axes along which the operation is performed.
                  The default (axis=None) is to perform the operation
@@ -1374,7 +1374,7 @@ def var(a, axis=None, ddof=0):
     """
     Request the variance of an Array over any number of axes.
 
-    .. note:: Currently limited to axis=0.
+    .. note:: Currently limited to operating on a single axis.
 
     :param axis: Axis or axes along which the operation is performed.
                  The default (axis=None) is to perform the operation
