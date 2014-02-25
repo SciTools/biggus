@@ -102,13 +102,38 @@ QUEUE_POISON = None
 
 
 class Node(object):
+    """A node of an expression evaluation graph."""
+
+    __metaclass__ = ABCMeta
+
     def __init__(self):
         self.output_queues = []
 
     def add_output_queue(self, output_queue):
+        """
+        Register a queue so it will receive the output Chunks from this
+        Node.
+
+        """
         self.output_queues.append(output_queue)
 
+    def output(self, chunk):
+        """
+        Dispatch the given Chunk onto all the registered output queues.
+
+        If the chunk is None, it is silently ignored.
+
+        """
+        if chunk is not None:
+            for queue in self.output_queues:
+                queue.put(chunk)
+
+    @abstractmethod
+    def run(self):
+        pass
+
     def thread(self):
+        """Start a new daemon thread which executes the `run` method."""
         thread = threading.Thread(target=self.run, name=str(self))
         thread.daemon = True
         thread.start()
@@ -116,6 +141,14 @@ class Node(object):
 
 
 class ProducerNode(Node):
+    """
+    A data-source node in an expression evaluation graph.
+
+    A ProducerNode corresponds to an Array which simply contains its
+    source data. The relevant Array classes are: `NumpyArrayAdapter`,
+    `OrthoArrayAdapater`, `ArrayStack`, and `LinearMosaic`.
+
+    """
     def __init__(self, array, iteration_order, masked):
         assert array.ndim == len(iteration_order)
         self.array = array
@@ -129,6 +162,14 @@ class ProducerNode(Node):
                                  always_slices=True)
 
     def run(self):
+        """
+        Emit the Chunk instances which cover the underlying Array.
+
+        The Array is divided into chunks with a size limit of
+        MAX_CHUNK_SIZE which are emitted into all registered output
+        queues.
+
+        """
         try:
             all_cuts = self.all_cuts()
             all_cuts = [all_cuts[i] for i in self.iteration_order]
@@ -143,39 +184,60 @@ class ProducerNode(Node):
                 else:
                     data = self.array[key].ndarray()
                 output_chunk = Chunk(key, data)
-                for queue in self.output_queues:
-                    queue.put(output_chunk)
+                self.output(output_chunk)
         finally:
             for queue in self.output_queues:
                 queue.put(QUEUE_POISON)
 
 
 class ConsumerNode(Node):
-    __metaclass__ = ABCMeta
+    """
+    A computation/result-accumulation node in an expression evaluation
+    graph.
+
+    A ConsumerNode corresponds to either: an Array which is computed
+    from one or more other Arrays; or a container for the result of an
+    expressions, such as an in-memory array or file.
+
+    """
 
     def __init__(self):
         self.input_queues = []
         super(ConsumerNode, self).__init__()
 
     def add_input_nodes(self, input_nodes):
+        """
+        Set the given nodes as inputs for this node.
+
+        Creates a limited-size Queue.Queue for each input node and
+        registers each queue as an output of its corresponding node.
+
+        """
         self.input_queues = [Queue.Queue(maxsize=3) for _ in input_nodes]
         for input_node, input_queue in zip(input_nodes, self.input_queues):
             input_node.add_output_queue(input_queue)
 
     @abstractmethod
     def finalise(self):
-        pass
+        """
+        Output any remaining partial results.
 
-    def output(self, chunk):
-        if chunk is not None:
-            for queue in self.output_queues:
-                queue.put(chunk)
+        Called once all the input chunks have been processed.
+
+        """
+        pass
 
     @abstractmethod
     def process_chunks(self, chunks):
+        """Process one chunk from each input node."""
         pass
 
     def run(self):
+        """
+        Process the input queues in lock-step, and push any results to
+        the registered output queues.
+
+        """
         try:
             while True:
                 input_chunks = [input.get() for input in self.input_queues]
@@ -207,6 +269,14 @@ class StreamsHandlerNode(ConsumerNode):
 
 
 class NdarrayNode(ConsumerNode):
+    """
+    An in-memory result node in an expression evaluation graph.
+
+    An NdarrayNode corresponds to either a numpy ndarray instance or a
+    MaskedArray instance.
+
+    """
+
     def __init__(self, array, masked):
         if masked:
             self.result = np.ma.empty(array.shape, dtype=array.dtype)
@@ -218,6 +288,11 @@ class NdarrayNode(ConsumerNode):
         pass
 
     def process_chunks(self, chunks):
+        """
+        Store the incoming chunk at the corresponding position in the
+        result array.
+
+        """
         chunk, = chunks
         if chunk.keys:
             self.result[chunk.keys] = chunk.data
@@ -226,8 +301,29 @@ class NdarrayNode(ConsumerNode):
 
 
 class AllThreadedEngine(Engine):
+    """
+    Evaluates lazy expressions by creating a thread for each node in the
+    expression graph.
+
+    """
     class Group(object):
+        """
+        A collection of Array instances which are to be evaluated in
+        parallel.
+
+        """
+
         def __init__(self, arrays, indices):
+            """
+            Creates a collection of Array instances and their
+            corresponding indices into the overall list of results.
+
+            Parameters
+            ----------
+            arrays : iterable of biggus.Array instances
+            indices : iterable of int
+
+            """
             self.arrays = arrays
             self.indices = indices
             self._node_cache = {}
@@ -254,6 +350,20 @@ class AllThreadedEngine(Engine):
             return node
 
         def evaluate(self, masked):
+            """
+            Convert each of the Array instances in this group into its
+            corresponding ndarray/MaskedArray.
+
+            Parameters
+            ----------
+            masked : bool
+                Whether to use ndarray or MaskedArray computations.
+
+            Returns
+            -------
+            list of ndarray or MaskedArray instances
+
+            """
             # Construct nodes starting from the producers.
             result_nodes = []
             result_threads = []
