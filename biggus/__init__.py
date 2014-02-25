@@ -1332,8 +1332,6 @@ def _normalise_axis(axis, array):
     if axis is None:
         axes = None
     elif isinstance(axis, int):
-        if axis < 0:
-            axis = array.ndim + axis
         axes = (axis,)
     elif (isinstance(axis, collections.Iterable) and
             not isinstance(axis, (basestring, collections.Mapping)) and
@@ -1341,8 +1339,10 @@ def _normalise_axis(axis, array):
         axes = tuple(axis)
     else:
         raise TypeError('axis must be None, int, or iterable of ints')
-    if axes is not None and not all(0 <= axis < array.ndim for axis in axes):
-        raise ValueError("'axis' value is out of bounds")
+    if axes is not None:
+        axes = tuple(axis if axis >= 0 else array.ndim + axis for axis in axes)
+        if not all(0 <= axis < array.ndim for axis in axes):
+            raise ValueError("'axis' value is out of bounds")
     return axes
 
 

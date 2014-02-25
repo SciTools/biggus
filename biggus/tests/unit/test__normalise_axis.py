@@ -18,17 +18,22 @@
 
 import unittest
 
+import mock
+
 from biggus import _normalise_axis
+
+
+ARRAY = mock.Mock(ndim=9)
 
 
 class TestNone(unittest.TestCase):
     def test(self):
-        self.assertIs(_normalise_axis(None), None)
+        self.assertIs(_normalise_axis(None, ARRAY), None)
 
 
 class TestValid(unittest.TestCase):
     def check(self, argument, expected):
-        result = _normalise_axis(argument)
+        result = _normalise_axis(argument, ARRAY)
         self.assertEqual(result, expected)
         self.assertIsInstance(result, tuple)
 
@@ -50,33 +55,42 @@ class TestValid(unittest.TestCase):
     def test_multi_list(self):
         self.check([4, 1], (4, 1))
 
+    def test_negative(self):
+        self.check(-1, (8,))
+
+    def test_negative_tuple(self):
+        self.check((-1), (8,))
+
+    def test_mixed(self):
+        self.check((-1, 3, -2), (8, 3, 7))
+
 
 class TestInvalidInt(unittest.TestCase):
     def test_builtin(self):
         with self.assertRaises(TypeError):
-            _normalise_axis(open)
+            _normalise_axis(open, ARRAY)
 
     def test_dict(self):
         with self.assertRaises(TypeError):
-            _normalise_axis({})
+            _normalise_axis({}, ARRAY)
 
     def test_float(self):
         with self.assertRaises(TypeError):
-            _normalise_axis(2.3)
+            _normalise_axis(2.3, ARRAY)
 
     def test_str(self):
         with self.assertRaises(TypeError):
-            _normalise_axis('23')
+            _normalise_axis('23', ARRAY)
 
 
 class TestInvalidIterable(unittest.TestCase):
     def test_mixed_tuple(self):
         with self.assertRaises(TypeError):
-            _normalise_axis((2, '23', 6))
+            _normalise_axis((2, '23', 6), ARRAY)
 
     def test_all_bad_tuple(self):
         with self.assertRaises(TypeError):
-            _normalise_axis((2.8, '23', {6: 3}))
+            _normalise_axis((2.8, '23', {6: 3}), ARRAY)
 
 
 if __name__ == '__main__':
