@@ -32,6 +32,14 @@ class TestInvalidAxis(unittest.TestCase):
         with self.assertRaises(AssertionError):
             mean(self.array)
 
+    def test_too_large(self):
+        with self.assertRaises(ValueError):
+            mean(self.array, axis=1)
+
+    def test_too_small(self):
+        with self.assertRaises(ValueError):
+            mean(self.array, axis=-2)
+
     def test_multiple(self):
         array = biggus.NumpyArrayAdapter(np.arange(12).reshape(3, 4))
         with self.assertRaises(AssertionError):

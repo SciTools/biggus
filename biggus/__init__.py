@@ -187,8 +187,9 @@ class ProducerNode(Node):
                 key = tuple(cuts[i] for cuts, i in zip(all_cuts, cut_indices))
                 key = tuple(key[i] for i in inverse_order)
                 # Now we have the slices that describe the next chunk.
-                # For example, key might be equivalent to `[11:12, 0:3, :, :]`.
-                # Simply "realise" the data for that region and eit it
+                # For example, key might be equivalent to
+                # `[11:12, 0:3, :, :]`.
+                # Simply "realise" the data for that region and emit it
                 # as a Chunk to all registered output queues.
                 if self.masked:
                     data = self.array[key].masked_array()
@@ -1304,12 +1305,14 @@ class _Aggregation(ComputedArray):
         return handler_class(source, self._axis, **self._kwargs)
 
 
-def _normalise_axis(axis):
-    # Convert `axis` to None, or a tuple of ints, or raise a
-    # TypeError.
+def _normalise_axis(axis, array):
+    # Convert `axis` to None, or a tuple of positive ints, or raise a
+    # TypeError/ValueError.
     if axis is None:
         axes = None
     elif isinstance(axis, int):
+        if axis < 0:
+            axis = array.ndim + axis
         axes = (axis,)
     elif (isinstance(axis, collections.Iterable) and
             not isinstance(axis, (basestring, collections.Mapping)) and
@@ -1317,6 +1320,8 @@ def _normalise_axis(axis):
         axes = tuple(axis)
     else:
         raise TypeError('axis must be None, int, or iterable of ints')
+    if axes is not None and not all(0 <= axis < array.ndim for axis in axes):
+        raise ValueError("'axis' value is out of bounds")
     return axes
 
 
@@ -1338,7 +1343,7 @@ def mean(a, axis=None):
     :rtype: Array
 
     """
-    axes = _normalise_axis(axis)
+    axes = _normalise_axis(axis, a)
     assert axes is not None and len(axes) == 1
     dtype = (np.array([0], dtype=a.dtype) / 1.).dtype
     return _Aggregation(a, axes[0],
@@ -1367,7 +1372,7 @@ def std(a, axis=None, ddof=0):
     :rtype: Array
 
     """
-    axes = _normalise_axis(axis)
+    axes = _normalise_axis(axis, a)
     assert axes is not None and len(axes) == 1
     dtype = (np.array([0], dtype=a.dtype) / 1.).dtype
     return _Aggregation(a, axes[0],
@@ -1396,7 +1401,7 @@ def var(a, axis=None, ddof=0):
     :rtype: Array
 
     """
-    axes = _normalise_axis(axis)
+    axes = _normalise_axis(axis, a)
     assert axes is not None and len(axes) == 1
     dtype = (np.array([0], dtype=a.dtype) / 1.).dtype
     return _Aggregation(a, axes[0],

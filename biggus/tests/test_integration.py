@@ -37,6 +37,15 @@ class TestChaining(unittest.TestCase):
         numpy_result = np.mean(raw_data2 - raw_data1, axis=0)
         np.testing.assert_array_equal(result, numpy_result)
 
+    def test_mean_of_mean(self):
+        data = np.arange(24).reshape(3, 4, 2)
+        array = biggus.NumpyArrayAdapter(data)
+        mean1 = biggus.mean(array, axis=1)
+        mean2 = biggus.mean(mean1, axis=-1)
+        expected = np.mean(np.mean(data, axis=1), axis=-1)
+        result = mean2.ndarray()
+        np.testing.assert_array_equal(result, expected)
+
 
 if __name__ == '__main__':
     unittest.main()
