@@ -1048,7 +1048,9 @@ class _StreamsHandler(object):
 
 
 class _AggregationStreamsHandler(_StreamsHandler):
-    def __init__(self):
+    def __init__(self, array, axis):
+        self.array = array
+        self.axis = axis
         self.current_keys = None
 
     @abstractmethod
@@ -1082,11 +1084,6 @@ class _AggregationStreamsHandler(_StreamsHandler):
 
 
 class _MeanStreamsHandler(_AggregationStreamsHandler):
-    def __init__(self, array, axis):
-        self.array = array
-        self.axis = axis
-        super(_MeanStreamsHandler, self).__init__()
-
     def bootstrap(self, shape):
         self.running_total = np.zeros(shape, dtype=self.array.dtype)
 
@@ -1103,11 +1100,6 @@ class _MeanStreamsHandler(_AggregationStreamsHandler):
 
 
 class _MeanMaskedStreamsHandler(_AggregationStreamsHandler):
-    def __init__(self, array, axis):
-        self.array = array
-        self.axis = axis
-        super(_MeanMaskedStreamsHandler, self).__init__()
-
     def bootstrap(self, shape):
         self.running_count = np.zeros(shape, dtype=self.array.dtype)
         self.running_total = np.zeros(shape, dtype=self.array.dtype)
@@ -1137,10 +1129,8 @@ class _StdStreamsHandler(_AggregationStreamsHandler):
     # http://zach.in.tu-clausthal.de/teaching/info_literatur/Welford.pdf
 
     def __init__(self, array, axis, ddof):
-        self.array = array
-        self.axis = axis
         self.ddof = ddof
-        super(_StdStreamsHandler, self).__init__()
+        super(_StdStreamsHandler, self).__init__(array, axis)
 
     def bootstrap(self, shape):
         self.k = 1
@@ -1186,10 +1176,8 @@ class _StdMaskedStreamsHandler(_AggregationStreamsHandler):
     # http://zach.in.tu-clausthal.de/teaching/info_literatur/Welford.pdf
 
     def __init__(self, array, axis, ddof):
-        self.array = array
-        self.axis = axis
         self.ddof = ddof
-        super(_StdMaskedStreamsHandler, self).__init__()
+        super(_StdMaskedStreamsHandler, self).__init__(array, axis)
 
     def bootstrap(self, shape):
         dtype = (np.zeros(1, dtype=self.array.dtype) / 1.).dtype
