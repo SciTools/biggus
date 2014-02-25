@@ -83,5 +83,33 @@ class TestAggregation(unittest.TestCase):
         self._test_aggregation(biggus.var, np.var, ddof=1)
 
 
+class TestFlow(unittest.TestCase):
+    def _test_flow(self, axis):
+        data = np.arange(3 * 4 * 5, dtype='f4').reshape(3, 4, 5)
+        array = biggus.NumpyArrayAdapter(data)
+        mean = biggus.mean(array, axis=axis)
+        engine = biggus.AllThreadedEngine()
+        chunk_size = biggus.MAX_CHUNK_SIZE
+        try:
+            # Artificially constrain the chunk size to eight bytes to
+            # ensure biggus is stepping across axes in the correct
+            # order.
+            biggus.MAX_CHUNK_SIZE = 8
+            op_result, = engine.ndarrays(mean)
+        finally:
+            biggus.MAX_CHUNK_SIZE = chunk_size
+        np_result = np.mean(data, axis=axis)
+        np.testing.assert_array_almost_equal(op_result, np_result)
+
+    def test_axis_0(self):
+        self._test_flow(0)
+
+    def test_axis_1(self):
+        self._test_flow(1)
+
+    def test_axis_2(self):
+        self._test_flow(2)
+
+
 if __name__ == '__main__':
     unittest.main()

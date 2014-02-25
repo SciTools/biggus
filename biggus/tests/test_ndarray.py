@@ -41,12 +41,8 @@ class TestNdarray(unittest.TestCase):
 
         mean, std_dev = biggus.ndarrays([mean_array, std_array])
 
-        # Was the source data read the minimal number of times?
-        # (Allow first slice of A to be read twice because both
-        # `mean` and `std` operations use it to to bootstrap their
-        # calculations.)
-        self.assert_counts(counter.counts[0], [2])
-        self.assert_counts(counter.counts[1:], [1])
+        # Was the source data read just once?
+        self.assert_counts(counter.counts, [1])
 
     def test_mean_of_difference(self):
         # MEAN(A - B)
@@ -84,14 +80,9 @@ class TestNdarray(unittest.TestCase):
                                              np.mean(raw_data * 2, axis=0))
         np.testing.assert_array_almost_equal(std,
                                              np.std(raw_data * 2, axis=0))
-        # Was the source data read the minimal number of times?
-        # (Allow first slice of A and B to be read twice because both
-        # `mean` and `std` operations use it to to bootstrap their
-        # calculations.)
-        self.assert_counts(a_counter.counts[0], [2])
-        self.assert_counts(a_counter.counts[1:], [1])
-        self.assert_counts(b_counter.counts[0], [2])
-        self.assert_counts(b_counter.counts[1:], [1])
+        # Was the source data read just once?
+        self.assert_counts(a_counter.counts, [1])
+        self.assert_counts(b_counter.counts, [1])
 
     @unittest.expectedFailure
     def test_mean_of_a_and_mean_of_difference(self):
