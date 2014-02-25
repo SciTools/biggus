@@ -100,7 +100,8 @@ class Engine(object):
 Chunk = collections.namedtuple('Chunk', 'keys data')
 
 
-QUEUE_POISON = None
+QUEUE_FINISHED = None
+QUEUE_ABORT = Exception
 
 
 class Node(object):
@@ -110,6 +111,11 @@ class Node(object):
 
     def __init__(self):
         self.output_queues = []
+
+    def abort(self):
+        """Send the abort signal to all registered output queues."""
+        for queue in self.output_queues:
+            queue.put(QUEUE_ABORT)
 
     def add_output_queue(self, output_queue):
         """
@@ -197,9 +203,12 @@ class ProducerNode(Node):
                     data = self.array[key].ndarray()
                 output_chunk = Chunk(key, data)
                 self.output(output_chunk)
-        finally:
+        except:
+            self.abort()
+            raise
+        else:
             for queue in self.output_queues:
-                queue.put(QUEUE_POISON)
+                queue.put(QUEUE_FINISHED)
 
 
 class ConsumerNode(Node):
@@ -259,13 +268,19 @@ class ConsumerNode(Node):
                 input_chunks = [input.get() for input in self.input_queues]
                 for input in self.input_queues:
                     input.task_done()
-                if any(chunk is QUEUE_POISON for chunk in input_chunks):
+                if any(chunk is QUEUE_ABORT for chunk in input_chunks):
+                    self.abort()
+                    return
+                if any(chunk is QUEUE_FINISHED for chunk in input_chunks):
                     break
                 self.output(self.process_chunks(input_chunks))
             self.output(self.finalise())
-        finally:
+        except:
+            self.abort()
+            raise
+        else:
             for queue in self.output_queues:
-                queue.put(QUEUE_POISON)
+                queue.put(QUEUE_FINISHED)
 
 
 class StreamsHandlerNode(ConsumerNode):
@@ -304,6 +319,9 @@ class NdarrayNode(ConsumerNode):
         else:
             self.result = np.empty(array.shape, dtype=array.dtype)
         super(NdarrayNode, self).__init__()
+
+    def abort(self):
+        self.result = None
 
     def finalise(self):
         pass
@@ -404,7 +422,10 @@ class AllThreadedEngine(Engine):
             for thread in result_threads:
                 thread.join()
 
-            return [node.result for node in result_nodes]
+            results = [node.result for node in result_nodes]
+            if any(result is None for result in results):
+                raise Exception('error during evaluation')
+            return results
 
     def _groups(self, arrays):
         # XXX Placeholder implementation which assumes everything
