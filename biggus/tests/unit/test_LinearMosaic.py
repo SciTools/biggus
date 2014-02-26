@@ -20,9 +20,8 @@ import unittest
 
 import numpy as np
 
-import biggus
-
 from biggus import LinearMosaic
+import biggus
 
 
 class FakeArray(biggus.Array):
