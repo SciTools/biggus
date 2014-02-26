@@ -18,66 +18,45 @@
 
 import unittest
 
+import mock
 import numpy as np
 
 from biggus import LinearMosaic
-import biggus
 
 
-class FakeArray(biggus.Array):
-    def __init__(self, fill_value):
-        self._fill_value = fill_value
-
-    @property
-    def dtype(self):
-        pass
-
-    @property
-    def fill_value(self):
-        return self._fill_value
-
-    @property
-    def shape(self):
-        return (3, 4)
-
-    def __getitem__(self, keys):
-        pass
-
-    def ndarray(self, keys):
-        pass
-
-    def masked_array(self, keys):
-        pass
+def fake_array(fill_value):
+    return mock.Mock(shape=(3, 4), dtype=mock.sentinel.DTYPE,
+                     fill_value=fill_value)
 
 
 class Test___init___fill_values(unittest.TestCase):
     def test_nan_nan(self):
-        array1 = FakeArray(np.nan)
-        array2 = FakeArray(np.nan)
+        array1 = fake_array(np.nan)
+        array2 = fake_array(np.nan)
         stack = LinearMosaic(np.array([array1, array2]), 0)
         self.assertTrue(np.isnan(stack.fill_value))
 
     def test_nan_number(self):
-        array1 = FakeArray(np.nan)
-        array2 = FakeArray(42)
+        array1 = fake_array(np.nan)
+        array2 = fake_array(42)
         with self.assertRaises(ValueError):
             stack = LinearMosaic(np.array([array1, array2]), 0)
 
     def test_number_nan(self):
-        array1 = FakeArray(42)
-        array2 = FakeArray(np.nan)
+        array1 = fake_array(42)
+        array2 = fake_array(np.nan)
         with self.assertRaises(ValueError):
             stack = LinearMosaic(np.array([array1, array2]), 0)
 
     def test_number_number(self):
-        array1 = FakeArray(42)
-        array2 = FakeArray(42)
+        array1 = fake_array(42)
+        array2 = fake_array(42)
         stack = LinearMosaic(np.array([array1, array2]), 0)
         self.assertEqual(stack.fill_value, 42)
 
     def test_number_other_number(self):
-        array1 = FakeArray(42)
-        array2 = FakeArray(43)
+        array1 = fake_array(42)
+        array2 = fake_array(43)
         with self.assertRaises(ValueError):
             stack = LinearMosaic(np.array([array1, array2]), 0)
 
