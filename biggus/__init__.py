@@ -61,7 +61,7 @@ import numpy as np
 import numpy.ma as ma
 
 
-__version__ = '0.5.x'
+__version__ = '0.5.0'
 
 
 class Engine(object):
