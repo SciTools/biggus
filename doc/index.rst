@@ -7,7 +7,12 @@ Welcome to Biggus's documentation!
 ==================================
 
 .. automodule:: biggus
-    :members:
+
+.. toctree::
+
+    creation
+    computation
+
 
 Indices and tables
 ==================

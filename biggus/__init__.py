@@ -29,7 +29,8 @@ All operations are performed in a lazy fashion to avoid overloading
 system resources. Conversion to a concrete NumPy ndarray requires an
 explicit method call.
 
-Example:
+For example::
+
     # Wrap two large data sources (e.g. 52000 x 800 x 600).
     measured = OrthoArrayAdapter(netcdf_var_a)
     predicted = OrthoArrayAdapter(netcdf_var_b)

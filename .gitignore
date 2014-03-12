@@ -31,3 +31,7 @@ pip-log.txt
 \#*
 \.\#*
 *.swp
+
+# Builds
+MANIFEST
+doc/_build
