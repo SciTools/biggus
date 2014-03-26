@@ -1,4 +1,4 @@
-from distutils.core import setup
+from setuptools import setup
 
 setup(
     name='Biggus',
@@ -11,4 +11,5 @@ setup(
                  'GNU Lesser General Public License v3 (LGPLv3)'],
     description='Virtual large arrays and lazy evaluation',
     long_description=open('README.rst').read(),
+    use_2to3=True,
 )

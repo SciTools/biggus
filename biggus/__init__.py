@@ -557,7 +557,7 @@ class _ArrayAdapter(Array):
         Raises IndexError/TypeError for invalid keys.
 
         """
-        if isinstance(key, int):
+        if isinstance(key, (int, np.integer)):
             if key >= size or key < -size:
                 msg = 'index {0} is out of bounds for axis {1} with' \
                       ' size {2}'.format(key, axis, size)
@@ -587,7 +587,7 @@ class _ArrayAdapter(Array):
 
         """
         size = len(indices)
-        if isinstance(new_key, int):
+        if isinstance(new_key, (int, np.integer)):
             if new_key >= size or new_key < -size:
                 msg = 'index {0} is out of bounds for axis {1}' \
                       ' with size {2}'.format(new_key, axis, size)
@@ -627,7 +627,7 @@ class _ArrayAdapter(Array):
         while src_keys and new_keys:
             src_size = shape.pop(0)
             src_key = src_keys.pop(0)
-            if isinstance(src_key, int):
+            if isinstance(src_key, (int, np.integer)):
                 # An integer src_key means this dimension has
                 # already been sliced away - it's not visible to
                 # the new keys.
@@ -724,7 +724,8 @@ class NumpyArrayAdapter(_ArrayAdapter):
                 for i, key in tuple_keys:
                     cut_keys[i] = slice(None)
                 array = self.concrete[tuple(cut_keys)]
-                is_scalar = [isinstance(key, int) for key in cut_keys]
+                is_scalar = [isinstance(key, (int, np.integer))
+                             for key in cut_keys]
                 dimensions -= np.cumsum(is_scalar)
             else:
                 # Use ellipsis indexing to ensure we have a real ndarray
@@ -809,7 +810,8 @@ class ArrayStack(Array):
         if len(keys) > self.ndim:
             raise IndexError('too many keys')
         for key in keys:
-            if not(isinstance(key, (int, slice, tuple, np.ndarray))):
+            if not(isinstance(key, (int, np.integer,
+                                    slice, tuple, np.ndarray))):
                 raise TypeError('invalid index: {!r}'.format(key))
 
         stack_ndim = self._stack.ndim
@@ -832,7 +834,7 @@ class ArrayStack(Array):
     def __setitem__(self, keys, value):
         assert len(keys) == self._stack.ndim
         for key in keys:
-            assert isinstance(key, int)
+            assert isinstance(key, (int, np.integer))
         assert isinstance(value, Array), type(value)
         self._stack[keys] = value
 
@@ -909,14 +911,15 @@ class LinearMosaic(Array):
             # then it's safe to just pass the keys to each tile.
             tile = self._tiles[0]
             tiles = [tile[keys] for tile in self._tiles]
-            scalar_keys = filter(lambda key: isinstance(key, int), keys)
+            f = lambda key: isinstance(key, (int, np.integer))
+            scalar_keys = filter(f, keys)
             result = LinearMosaic(tiles, axis - len(scalar_keys))
         else:
             axis_lengths = [tile.shape[axis] for tile in self._tiles]
             offsets = np.cumsum([0] + axis_lengths[:-1])
             splits = offsets - 1
             axis_key = keys[axis]
-            if isinstance(axis_key, int):
+            if isinstance(axis_key, (int, np.integer)):
                 # Find the single relevant tile
                 tile_index = np.searchsorted(splits, axis_key) - 1
                 tile = self._tiles[tile_index]
@@ -939,7 +942,7 @@ class LinearMosaic(Array):
                 tiles = []
                 tile_slice = list(keys)
                 for tile_index, group_of_pairs in i:
-                    axis_indices = zip(*group_of_pairs)[0]
+                    axis_indices = list(zip(*group_of_pairs))[0]
                     tile = self._tiles[tile_index]
                     axis_indices = np.array(axis_indices)
                     axis_indices -= offsets[tile_index]
@@ -1337,11 +1340,11 @@ def _normalise_axis(axis, array):
     # TypeError/ValueError.
     if axis is None:
         axes = None
-    elif isinstance(axis, int):
+    elif isinstance(axis, (int, np.integer)):
         axes = (axis,)
     elif (isinstance(axis, collections.Iterable) and
             not isinstance(axis, (basestring, collections.Mapping)) and
-            all(map(lambda x: isinstance(x, int), axis))):
+            all(map(lambda x: isinstance(x, (int, np.integer)), axis))):
         axes = tuple(axis)
     else:
         raise TypeError('axis must be None, int, or iterable of ints')
@@ -1535,8 +1538,8 @@ def _sliced_shape(shape, keys):
     """
     sliced_shape = []
     # TODO: Watch out for more keys than shape entries.
-    for size, key in map(None, shape, keys):
-        if isinstance(key, int):
+    for size, key in itertools.izip_longest(shape, keys):
+        if isinstance(key, (int, np.integer)):
             continue
         elif isinstance(key, slice):
             size = len(range(*key.indices(size)))
