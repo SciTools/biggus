@@ -30,15 +30,14 @@ class TestCodeFormat(unittest.TestCase):
     """Test code conformance."""
 
     def test_pep8_conformance(self):
-#
-#        Tests the biggus code base against the "pep8" tool.
-#
-#        Users can add their own excluded files (should files exist in the
-#        local directory which is not in the repository) by adding a
-#        ".pep8_test_exclude.txt" file in the same directory as this test.
-#        The file should be a line separated list of filenames/directories
-#        as can be passed to the "pep8" tool's exclude list.
-#
+        # Tests the biggus code base against the "pep8" tool.
+        #
+        # Users can add their own excluded files (should files exist in the
+        # local directory which is not in the repository) by adding a
+        # ".pep8_test_exclude.txt" file in the same directory as this test.
+        # The file should be a line separated list of filenames/directories
+        # as can be passed to the "pep8" tool's exclude list.
+
         pep8style = pep8.StyleGuide(quiet=False)
         pep8style.options.exclude.extend([])
 
