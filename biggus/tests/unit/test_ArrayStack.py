@@ -24,8 +24,8 @@ import numpy as np
 from biggus import ArrayStack
 
 
-def fake_array(fill_value):
-    return mock.Mock(shape=mock.sentinel.SHAPE, dtype=mock.sentinel.DTYPE,
+def fake_array(fill_value, dtype=np.dtype('f4')):
+    return mock.Mock(shape=mock.sentinel.SHAPE, dtype=dtype,
                      fill_value=fill_value)
 
 
@@ -57,6 +57,18 @@ class Test___init___fill_values(unittest.TestCase):
     def test_number_other_number(self):
         array1 = fake_array(42)
         array2 = fake_array(43)
+        with self.assertRaises(ValueError):
+            stack = ArrayStack(np.array([array1, array2]))
+
+    def test_matching_strings(self):
+        array1 = fake_array('foo', np.dtype('S3'))
+        array2 = fake_array('foo', np.dtype('S3'))
+        stack = ArrayStack(np.array([array1, array2]))
+        self.assertEqual(stack.fill_value, 'foo')
+
+    def test_different_strings(self):
+        array1 = fake_array('foo', np.dtype('S3'))
+        array2 = fake_array('bar', np.dtype('S3'))
         with self.assertRaises(ValueError):
             stack = ArrayStack(np.array([array1, array2]))
 
