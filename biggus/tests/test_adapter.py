@@ -21,7 +21,7 @@ import numpy as np
 import biggus
 
 
-class _TestAdapter(unittest.TestCase):
+class _TestAdapter(object):
     longMessage = True
 
     def test_dtype(self):
@@ -155,12 +155,12 @@ class _TestAdapter(unittest.TestCase):
         return self.wrap(ndarray, keys)
 
 
-class TestNumpyAdapter(_TestAdapter):
+class TestNumpyAdapter(_TestAdapter, unittest.TestCase):
     def wrap(self, ndarray, keys):
         return biggus.NumpyArrayAdapter(ndarray, keys)
 
 
-class TestOrthoAdapter(_TestAdapter):
+class TestOrthoAdapter(_TestAdapter, unittest.TestCase):
     class Ortho(object):
         def __init__(self, array):
             self._array = array
