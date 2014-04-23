@@ -24,41 +24,52 @@ import numpy as np
 from biggus import LinearMosaic
 
 
-def fake_array(fill_value):
-    return mock.Mock(shape=(3, 4), dtype=mock.sentinel.DTYPE,
-                     fill_value=fill_value)
+def fake_array(fill_value, dtype=np.dtype('f4')):
+    return mock.Mock(shape=(3, 4), dtype=dtype, fill_value=fill_value)
 
 
 class Test___init___fill_values(unittest.TestCase):
     def test_nan_nan(self):
         array1 = fake_array(np.nan)
         array2 = fake_array(np.nan)
-        stack = LinearMosaic(np.array([array1, array2]), 0)
-        self.assertTrue(np.isnan(stack.fill_value))
+        mosaic = LinearMosaic(np.array([array1, array2]), 0)
+        self.assertTrue(np.isnan(mosaic.fill_value))
 
     def test_nan_number(self):
         array1 = fake_array(np.nan)
         array2 = fake_array(42)
         with self.assertRaises(ValueError):
-            stack = LinearMosaic(np.array([array1, array2]), 0)
+            mosaic = LinearMosaic(np.array([array1, array2]), 0)
 
     def test_number_nan(self):
         array1 = fake_array(42)
         array2 = fake_array(np.nan)
         with self.assertRaises(ValueError):
-            stack = LinearMosaic(np.array([array1, array2]), 0)
+            mosaic = LinearMosaic(np.array([array1, array2]), 0)
 
     def test_number_number(self):
         array1 = fake_array(42)
         array2 = fake_array(42)
-        stack = LinearMosaic(np.array([array1, array2]), 0)
-        self.assertEqual(stack.fill_value, 42)
+        mosaic = LinearMosaic(np.array([array1, array2]), 0)
+        self.assertEqual(mosaic.fill_value, 42)
 
     def test_number_other_number(self):
         array1 = fake_array(42)
         array2 = fake_array(43)
         with self.assertRaises(ValueError):
-            stack = LinearMosaic(np.array([array1, array2]), 0)
+            mosaic = LinearMosaic(np.array([array1, array2]), 0)
+
+    def test_matching_strings(self):
+        array1 = fake_array('foo', np.dtype('S3'))
+        array2 = fake_array('foo', np.dtype('S3'))
+        mosaic = LinearMosaic(np.array([array1, array2]), 0)
+        self.assertEqual(mosaic.fill_value, 'foo')
+
+    def test_different_strings(self):
+        array1 = fake_array('foo', np.dtype('S3'))
+        array2 = fake_array('bar', np.dtype('S3'))
+        with self.assertRaises(ValueError):
+            mosaic = LinearMosaic(np.array([array1, array2]), 0)
 
 
 if __name__ == '__main__':

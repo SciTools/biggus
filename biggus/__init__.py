@@ -776,13 +776,19 @@ class ArrayStack(Array):
         item_shape = first_array.shape
         dtype = first_array.dtype
         fill_value = first_array.fill_value
-        fill_value_is_nan = np.isnan(fill_value)
+        if np.issubdtype(dtype, np.floating):
+            def fill_value_ok(array):
+                return array.fill_value == fill_value or (
+                    np.isnan(fill_value) and np.isnan(array.fill_value))
+        else:
+            def fill_value_ok(array):
+                return array.fill_value == fill_value
         for array in stack.flat:
-            both_nan = fill_value_is_nan and np.isnan(array.fill_value)
             ok = (array.shape == item_shape and array.dtype == dtype and
-                  (fill_value == array.fill_value or both_nan))
+                  fill_value_ok(array))
             if not ok:
                 raise ValueError('invalid sub-array')
+
         self._stack = stack
         self._item_shape = item_shape
         self._dtype = dtype
@@ -864,7 +870,13 @@ class LinearMosaic(Array):
         common_shape = list(first.shape)
         common_dtype = first.dtype
         common_fill_value = first.fill_value
-        common_fill_value_is_nan = np.isnan(common_fill_value)
+        if np.issubdtype(common_dtype, np.floating):
+            def fill_value_ok(array):
+                return array.fill_value == common_fill_value or (
+                    np.isnan(common_fill_value) and np.isnan(array.fill_value))
+        else:
+            def fill_value_ok(array):
+                return array.fill_value == common_fill_value
         del common_shape[axis]
         for tile in tiles[1:]:
             shape = list(tile.shape)
@@ -873,8 +885,7 @@ class LinearMosaic(Array):
                 raise ValueError('inconsistent tile shapes')
             if tile.dtype != common_dtype:
                 raise ValueError('inconsistent tile dtypes')
-            both_nan = common_fill_value_is_nan and np.isnan(tile.fill_value)
-            if (common_fill_value != tile.fill_value and not both_nan):
+            if not fill_value_ok(tile):
                 raise ValueError('inconsistent tile fill_values')
         self._tiles = tiles
         self._axis = axis
