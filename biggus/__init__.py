@@ -527,6 +527,104 @@ class Array(object):
         return keys
 
 
+class ConstantArray(Array):
+    """
+    An Array which is completely filled with a single value.
+
+    Parameters
+    ----------
+    shape : int or sequence of ints
+        The shape for the new Array.
+    value : obj, optional
+        The value to fill the Array with. Defaults to 0.0.
+    dtype : obj, optional
+        Object to be converted to data type. Default is None which
+        instructs the data type to be determined as the minimum required
+        to hold the given value.
+
+    Returns
+    -------
+    Array
+        An Array entirely filled with ones.
+
+    """
+    def __init__(self, shape, value=0.0, dtype=None):
+        if isinstance(shape, basestring):
+            shape = (shape,)
+        else:
+            try:
+                shape = tuple(shape)
+            except TypeError:
+                shape = (shape,)
+        self._shape = tuple(map(int, shape))
+        data = np.array([value], dtype=dtype)
+        self.value = data[0]
+        self._dtype = data.dtype
+
+    @property
+    def dtype(self):
+        return self._dtype
+
+    @property
+    def shape(self):
+        return self._shape
+
+    def __getitem__(self, keys):
+        keys = self._normalise_keys(keys)
+        shape = _sliced_shape(self.shape, keys)
+        return ConstantArray(shape, self.value, self._dtype)
+
+    def ndarray(self):
+        result = np.empty(self.shape, self._dtype)
+        result.fill(self.value)
+        return result
+
+    def masked_array(self):
+        result = np.ma.empty(self.shape, self._dtype)
+        result.fill(self.value)
+        return result
+
+
+def zeros(shape, dtype=float):
+    """
+    Return an Array which is completely filled with zeros.
+
+    Parameters
+    ----------
+    shape : int or sequence of ints
+        The shape for the new Array.
+    dtype : obj, optional
+        Object to be converted to data type. Default is `float`.
+
+    Returns
+    -------
+    Array
+        An Array entirely filled with zeros.
+
+    """
+    return ConstantArray(shape, dtype=dtype)
+
+
+def ones(shape, dtype=float):
+    """
+    Return an Array which is completely filled with ones.
+
+    Parameters
+    ----------
+    shape : int or sequence of ints
+        The shape for the new Array.
+    dtype : obj, optional
+        Object to be converted to data type. Default is `float`.
+
+    Returns
+    -------
+    Array
+        An Array entirely filled with ones.
+
+    """
+    return ConstantArray(shape, 1, dtype=dtype)
+
+
 class _ArrayAdapter(Array):
     """
     Abstract base class for exposing a "concrete" data source as a

@@ -10,6 +10,17 @@ provides two adapter classes:
 
 .. autoclass:: OrthoArrayAdapter
 
+Constants
+---------
+
+For creating an Array with the same value in every element, biggus
+provides a simple class and two convenience functions which mimic NumPy.
+
+.. autoclass:: ConstantArray
+
+.. autofunction:: zeros
+.. autofunction:: ones
+
 
 Combining arrays
 ----------------
