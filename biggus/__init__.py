@@ -512,6 +512,20 @@ class Array(object):
 
         """
 
+    def _normalise_keys(self, keys):
+        if not isinstance(keys, tuple):
+            keys = (keys,)
+        # This weird check is safe against keys[-1] being an ndarray.
+        if keys and isinstance(keys[-1], type(Ellipsis)):
+            keys = keys[:-1]
+        if len(keys) > self.ndim:
+            raise IndexError('too many keys')
+        for key in keys:
+            if not(isinstance(key, (int, np.integer,
+                                    slice, tuple, np.ndarray))):
+                raise TypeError('invalid index: {!r}'.format(key))
+        return keys
+
 
 class _ArrayAdapter(Array):
     """
@@ -611,10 +625,7 @@ class _ArrayAdapter(Array):
         return result_key
 
     def __getitem__(self, keys):
-        if not isinstance(keys, tuple):
-            keys = (keys,)
-        if len(keys) > self.ndim:
-            raise IndexError('too many keys')
+        keys = self._normalise_keys(keys)
 
         result_keys = []
         shape = list(self.concrete.shape)
@@ -808,17 +819,7 @@ class ArrayStack(Array):
         return self._stack.shape + self._item_shape
 
     def __getitem__(self, keys):
-        if not isinstance(keys, tuple):
-            keys = (keys,)
-        # This weird check is safe against keys[-1] being an ndarray.
-        if isinstance(keys[-1], type(Ellipsis)):
-            keys = keys[:-1]
-        if len(keys) > self.ndim:
-            raise IndexError('too many keys')
-        for key in keys:
-            if not(isinstance(key, (int, np.integer,
-                                    slice, tuple, np.ndarray))):
-                raise TypeError('invalid index: {!r}'.format(key))
+        keys = self._normalise_keys(keys)
 
         stack_ndim = self._stack.ndim
         stack_keys = keys[:stack_ndim]
@@ -911,10 +912,7 @@ class LinearMosaic(Array):
         return self._cached_shape
 
     def __getitem__(self, keys):
-        if not isinstance(keys, tuple):
-            keys = (keys,)
-        if len(keys) > self.ndim:
-            raise IndexError('too many keys')
+        keys = self._normalise_keys(keys)
 
         axis = self._axis
         if len(keys) <= axis:
@@ -1320,8 +1318,7 @@ class _Aggregation(ComputedArray):
         return (self._array,)
 
     def __getitem__(self, keys):
-        if not isinstance(keys, tuple):
-            keys = (keys,)
+        keys = self._normalise_keys(keys)
         keys = (slice(None),) + keys
         return _Aggregation(self._array[keys], self._axis,
                             self._streams_handler_class,
@@ -1491,8 +1488,7 @@ class _Elementwise(ComputedArray):
         return (self._array1, self._array2)
 
     def __getitem__(self, keys):
-        if not isinstance(keys, tuple):
-            keys = (keys,)
+        keys = self._normalise_keys(keys)
         return _Elementwise(self._array1[keys], self._array2[keys],
                             self._numpy_op, self._ma_op)
 
