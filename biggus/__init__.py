@@ -876,6 +876,38 @@ class OrthoArrayAdapter(_ArrayAdapter):
         return array
 
 
+def _pairwise(iterable):
+    """
+    itertools recipe
+    "s -> (s0,s1), (s1,s2), (s2, s3), ...
+
+    """
+    a, b = itertools.tee(iterable)
+    next(b, None)
+    return itertools.izip(a, b)
+
+
+def _groups_of(length, total_length):
+    """
+    Return an iterator of tuples for slicing, in 'length' chunks.
+
+    Parameters
+    ----------
+    length : int
+        Length of each chunk.
+    total_length : int
+        Length of the object we are slicing
+
+    Returns
+    -------
+    iterable of tuples
+        Values defining a slice range resulting in length 'length'.
+
+    """
+    indices = tuple(range(0, total_length, length)) + (None, )
+    return _pairwise(indices)
+
+
 class ArrayStack(Array):
     """
     An Array made from a homogeneous array of other Arrays.
@@ -958,6 +990,76 @@ class ArrayStack(Array):
             masked_array = self._stack[index].masked_array()
             data[index] = masked_array
         return data
+
+    @staticmethod
+    def multidim_array_stack(arrays, shape, order='C'):
+        """
+        Create an N-dimensional ArrayStack from the sequence of Arrays of the
+        same shape.
+
+        Example usage: stacking 6 Arrays, each of shape (768, 1024) to a
+        specified shape (2, 3) will result in an ArrayStack of shape
+        (2, 3, 768, 1024).
+
+        Parameters
+        ----------
+        arrays : sequence of Arrays
+            The sequence of Arrays to be stacked, where each Array must be of
+            the same shape.
+        shape : sequence of ints
+            Shape of the stack, (2, 3) in the above example.
+        order : {'C', 'F'}, optional
+            Use C (C) or FORTRAN (F) index ordering.
+
+        Returns
+        -------
+        ArrayStack
+            With shape corresponding to tuple(stack shape) + tuple(Array.shape)
+            where each Array in the stack must be of the same shape.
+
+        """
+        order = order.lower()
+
+        # Ensure a suitable shape has been specified.
+        size_msg = "total size of new array must be unchanged"
+        try:
+            if np.product(shape) != np.product(arrays.shape):
+                raise ValueError(size_msg)
+            if arrays.ndim > 1:
+                raise ValueError("multidimensional stacks not yet supported")
+        except AttributeError:
+            if np.product(shape) != len(arrays):
+                raise ValueError(size_msg)
+        # Hold the subdivided array
+        subdivided_array = arrays
+
+        # Recursively subdivide to create an ArrayStack with specified shape.
+        for length in shape[::-1]:
+            # Hold the array before this iterations subdivide.
+            array_before_subdivide = subdivided_array
+            subdivided_array = []
+
+            if order == 'f':
+                num = len(array_before_subdivide) // length
+                if length == len(array_before_subdivide):
+                    slc = [slice(None)]
+                else:
+                    slc = [slice(i, None, num) for i in range(num)]
+                for sc in slc:
+                    sub = ArrayStack(np.array(array_before_subdivide[sc],
+                                              dtype=object))
+                    subdivided_array.append(sub)
+            elif order == 'c':
+                for start, stop in _groups_of(length,
+                                              len(array_before_subdivide)):
+                    sub = ArrayStack(np.array(
+                        array_before_subdivide[start:stop], dtype=object))
+                    subdivided_array.append(sub)
+            else:
+                raise TypeError('order not understood')
+        else:
+            # Last iteration, length of the array will be equal to 1.
+            return subdivided_array[0]
 
 
 class LinearMosaic(Array):

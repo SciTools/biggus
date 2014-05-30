@@ -21,7 +21,7 @@ import unittest
 import mock
 import numpy as np
 
-from biggus import Array, ArrayStack
+from biggus import Array, ArrayStack, NumpyArrayAdapter, ConstantArray
 
 
 class Test___init___invalid(unittest.TestCase):
@@ -51,13 +51,13 @@ class Test___init___fill_values(unittest.TestCase):
         array1 = fake_array(np.nan)
         array2 = fake_array(42)
         with self.assertRaises(ValueError):
-            stack = ArrayStack(np.array([array1, array2]))
+            ArrayStack(np.array([array1, array2]))
 
     def test_number_nan(self):
         array1 = fake_array(42)
         array2 = fake_array(np.nan)
         with self.assertRaises(ValueError):
-            stack = ArrayStack(np.array([array1, array2]))
+            ArrayStack(np.array([array1, array2]))
 
     def test_number_number(self):
         array1 = fake_array(42)
@@ -69,7 +69,7 @@ class Test___init___fill_values(unittest.TestCase):
         array1 = fake_array(42)
         array2 = fake_array(43)
         with self.assertRaises(ValueError):
-            stack = ArrayStack(np.array([array1, array2]))
+            ArrayStack(np.array([array1, array2]))
 
     def test_matching_strings(self):
         array1 = fake_array('foo', np.dtype('S3'))
@@ -81,7 +81,92 @@ class Test___init___fill_values(unittest.TestCase):
         array1 = fake_array('foo', np.dtype('S3'))
         array2 = fake_array('bar', np.dtype('S3'))
         with self.assertRaises(ValueError):
-            stack = ArrayStack(np.array([array1, array2]))
+            ArrayStack(np.array([array1, array2]))
+
+
+class Test_multidim_array_stack(unittest.TestCase):
+    def setUp(self):
+        self.arrays = np.array([ConstantArray((), i) for i in range(6)])
+
+    def test_stack_order_c_numpy_array_t1(self):
+        # 1D stack of arrays shape (6,)
+        res = ArrayStack.multidim_array_stack(self.arrays, (3, 2), order='C')
+        arr = np.array([i for i in range(6)])
+        target = np.reshape(arr, (3, 2), order='C')
+        self.assertTrue(np.array_equal(res.ndarray(), target))
+
+    def test_stack_order_c_numpy_array_t2(self):
+        # 1D stack of arrays shape (6,)
+        # alternate shape
+        res = ArrayStack.multidim_array_stack(self.arrays, (2, 3), order='C')
+        arr = np.array([i for i in range(6)])
+        target = np.reshape(arr, (2, 3), order='C')
+        self.assertTrue(np.array_equal(res.ndarray(), target))
+
+    def test_stack_order_c_list(self):
+        # 1D stack of arrays length  6
+        res = ArrayStack.multidim_array_stack(self.arrays.tolist(), (3, 2),
+                                              order='C')
+        arr = np.array([i for i in range(6)])
+        target = np.reshape(arr, (3, 2), order='C')
+        self.assertTrue(np.array_equal(res.ndarray(), target))
+
+    def test_stack_order_c_multidim(self):
+        # 1D stack of 6 arrays each (4, 5)
+        arrays = [NumpyArrayAdapter(np.arange(20).reshape(4, 5)) for
+                  i in range(6)]
+        res = ArrayStack.multidim_array_stack(arrays, (2, 3), order='C')
+        arr = np.arange(20).reshape(4, 5) * np.ones((6, 4, 5))
+        target = np.reshape(arr, (2, 3, 4, 5), order='C')
+        self.assertTrue(np.array_equal(res.ndarray(), target))
+
+    def test_stack_order_default(self):
+        # 1D stack of arrays shape (6,)
+        # Ensure that the default index ordering corresponds to C.
+        res = ArrayStack.multidim_array_stack(self.arrays, (3, 2))
+        arr = np.array([i for i in range(6)])
+        target = np.reshape(arr, (3, 2), order='C')
+        self.assertTrue(np.array_equal(res.ndarray(), target))
+
+    def test_stack_order_fortran_t1(self):
+        # Fortran index ordering
+        # 1D stack of arrays shape (6,)
+        res = ArrayStack.multidim_array_stack(self.arrays, (3, 2), order='F')
+        arr = np.array([i for i in range(6)])
+        target = np.reshape(arr, (3, 2), order='F')
+        self.assertTrue(np.array_equal(res.ndarray(), target))
+
+    def test_stack_order_fortran_t2(self):
+        # Fortran index ordering
+        # 1D stack of arrays shape (6,)
+        # alternate shape
+        res = ArrayStack.multidim_array_stack(self.arrays, (2, 3), order='F')
+        arr = np.array([i for i in range(6)])
+        target = np.reshape(arr, (2, 3), order='F')
+        self.assertTrue(np.array_equal(res.ndarray(), target))
+
+    def test_incompatible_shape(self):
+        # 1D stack of arrays shape (6,)
+        # Specifying a stack shape that is not feasible.
+        msg = 'total size of new array must be unchanged'
+        with self.assertRaisesRegexp(ValueError, msg):
+            ArrayStack.multidim_array_stack(self.arrays, (3, 1), order='C')
+
+    def test_multidim_stack_multidim(self):
+        # Multidim stack of arrays shape (4, 6)
+        arrays = np.array([[ConstantArray((), i) for i in range(6)] for
+                           i in range(4)])
+        msg = 'multidimensional stacks not yet supported'
+        with self.assertRaisesRegexp(ValueError, msg):
+            ArrayStack.multidim_array_stack(arrays, (3, 2, 4))
+
+    def test_order_incorrect_order(self):
+        # Specifying an unknown order.
+        array1 = fake_array(0)
+        array2 = fake_array(0)
+        with self.assertRaisesRegexp(TypeError, 'order not understood'):
+            ArrayStack.multidim_array_stack([array1, array2], (1, 2),
+                                            order='random')
 
 
 if __name__ == '__main__':
