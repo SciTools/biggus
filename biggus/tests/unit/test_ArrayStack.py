@@ -21,12 +21,23 @@ import unittest
 import mock
 import numpy as np
 
-from biggus import ArrayStack
+from biggus import Array, ArrayStack
+
+
+class Test___init___invalid(unittest.TestCase):
+    def test_not_arrays(self):
+        class BadArray(object):
+            dtype = 'f'
+            fill_value = 9
+            shape = ()
+        bad_arrays = np.array([BadArray()])
+        with self.assertRaisesRegexp(ValueError, 'subclass'):
+            ArrayStack(bad_arrays)
 
 
 def fake_array(fill_value, dtype=np.dtype('f4')):
     return mock.Mock(shape=mock.sentinel.SHAPE, dtype=dtype,
-                     fill_value=fill_value)
+                     fill_value=fill_value, spec=Array)
 
 
 class Test___init___fill_values(unittest.TestCase):

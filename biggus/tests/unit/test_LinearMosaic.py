@@ -21,11 +21,24 @@ import unittest
 import mock
 import numpy as np
 
-from biggus import LinearMosaic
+from biggus import Array, LinearMosaic
+
+
+class Test___init___invalid(unittest.TestCase):
+    def test_not_arrays(self):
+        class BadArray(object):
+            dtype = 'f'
+            fill_value = 9
+            ndim = 1
+            shape = (4,)
+        bad_arrays = [BadArray()]
+        with self.assertRaisesRegexp(ValueError, 'subclass'):
+            LinearMosaic(bad_arrays, 0)
 
 
 def fake_array(fill_value, dtype=np.dtype('f4')):
-    return mock.Mock(shape=(3, 4), dtype=dtype, fill_value=fill_value)
+    return mock.Mock(shape=(3, 4), dtype=dtype, fill_value=fill_value,
+                     spec=Array)
 
 
 class Test___init___fill_values(unittest.TestCase):

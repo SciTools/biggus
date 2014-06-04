@@ -894,6 +894,8 @@ class ArrayStack(Array):
             def fill_value_ok(array):
                 return array.fill_value == fill_value
         for array in stack.flat:
+            if not isinstance(array, Array):
+                raise ValueError('sub-array must be subclass of Array')
             ok = (array.shape == item_shape and array.dtype == dtype and
                   fill_value_ok(array))
             if not ok:
@@ -964,6 +966,8 @@ class LinearMosaic(Array):
         if tiles.ndim != 1:
             raise ValueError('the tiles array must be 1-dimensional')
         first = tiles[0]
+        if not isinstance(first, Array):
+            raise ValueError('sub-array must be subclass of Array')
         if not(0 <= axis < first.ndim):
             msg = 'invalid axis for {0}-dimensional tiles'.format(first.ndim)
             raise ValueError(msg)
@@ -980,6 +984,8 @@ class LinearMosaic(Array):
                 return array.fill_value == common_fill_value
         del common_shape[axis]
         for tile in tiles[1:]:
+            if not isinstance(tile, Array):
+                raise ValueError('sub-array must be subclass of Array')
             shape = list(tile.shape)
             del shape[axis]
             if shape != common_shape:
