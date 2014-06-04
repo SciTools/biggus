@@ -84,7 +84,6 @@ class TestNdarray(unittest.TestCase):
         self.assert_counts(a_counter.counts, [1])
         self.assert_counts(b_counter.counts, [1])
 
-    @unittest.expectedFailure
     def test_mean_of_a_and_mean_of_difference(self):
         # MEAN(A) and MEAN(A - B)
         shape = (500, 30, 40)
@@ -107,10 +106,7 @@ class TestNdarray(unittest.TestCase):
                                              np.mean(raw_data * 2, axis=0))
 
         # Was the source data read the minimal number of times?
-        # (Allow first slice of A to be read twice because both `mean`
-        # operations use it to to bootstrap their calculations.)
-        self.assert_counts(a_counter.counts[0], [2])
-        self.assert_counts(a_counter.counts[1:], [1])
+        self.assert_counts(a_counter.counts, [1])
         self.assert_counts(b_counter.counts, [1])
 
 
