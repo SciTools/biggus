@@ -26,8 +26,8 @@ import biggus
 class Test(unittest.TestCase):
     def test(self):
         # If we switch evaluation engine, does it get used?
-        array = biggus._Aggregation(mock.sentinel.array, None, None, None,
-                                    None, {})
+        array = biggus._Aggregation(biggus.ConstantArray(3, 2), None, None,
+                                    None, None, {})
         return_value = (mock.sentinel.result,)
         engine = mock.Mock(**{'ndarrays.return_value': return_value})
         with mock.patch('biggus.engine', engine):

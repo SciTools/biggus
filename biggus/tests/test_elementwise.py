@@ -78,6 +78,20 @@ class TestElementwise(unittest.TestCase):
     def test_sub(self):
         self._test_elementwise(biggus.sub, np.subtract)
 
+    def test_add_nd_array(self):
+        # Check that the ElementWise functionality accepts numpy arrays,
+        # and the result is as expected.
+        r = biggus.add(np.arange(12), np.arange(12))
+        self.assertIsInstance(r._array1, biggus.NumpyArrayAdapter)
+        self.assertIsInstance(r._array2, biggus.NumpyArrayAdapter)
+        self.assertEqual(r.ndarray()[-1], 22)
+
+    def test_add_non_supported_type(self):
+        # Check that the ElementWise functionality raises a TypeError
+        # if neither an Array or np.ndarray is given
+        with self.assertRaises(TypeError):
+            biggus.add(range(12), np.arange(12))
+
 
 if __name__ == '__main__':
     unittest.main()
