@@ -848,21 +848,6 @@ class NumpyArrayAdapter(_ArrayAdapter):
             array = self.concrete.__getitem__(keys)
         return array
 
-    @staticmethod
-    def cast_if_np_array(array):
-        """
-        Cast the given array to a NumpyArrayAdapter if appropriate, and
-        raise a TypeError if the result is not a :class:`Array`.
-
-        """
-        if isinstance(array, np.ndarray):
-            array = NumpyArrayAdapter(array)
-
-        if not isinstance(array, Array):
-            raise TypeError('The given array should be a `biggus.Array` '
-                            'instance, got {}.'.format(type(array)))
-        return array
-
 
 class OrthoArrayAdapter(_ArrayAdapter):
     """
@@ -1517,7 +1502,7 @@ class _Aggregation(ComputedArray):
     def __init__(self, array, axis,
                  streams_handler_class, masked_streams_handler_class,
                  dtype, kwargs):
-        self._array = NumpyArrayAdapter.cast_if_np_array(array)
+        self._array = ensure_array(array)
         self._axis = axis
         self._streams_handler_class = streams_handler_class
         self._masked_streams_handler_class = masked_streams_handler_class
@@ -1687,8 +1672,8 @@ class _ElementwiseStreamsHandler(_StreamsHandler):
 
 class _Elementwise(ComputedArray):
     def __init__(self, array1, array2, numpy_op, ma_op):
-        array1 = NumpyArrayAdapter.cast_if_np_array(array1)
-        array2 = NumpyArrayAdapter.cast_if_np_array(array2)
+        array1 = ensure_array(array1)
+        array2 = ensure_array(array2)
 
         # TODO: Broadcasting
         assert array1.shape == array2.shape
@@ -1781,3 +1766,21 @@ def _sliced_shape(shape, keys):
             sliced_shape.append(size)
     sliced_shape = tuple(sliced_shape)
     return sliced_shape
+
+
+def ensure_array(array):
+    """
+    Assert that the given array is an Array subclass (or numpy array).
+
+    If the given array is a numpy.ndarray an appropriate NumpyArrayAdapter
+    instance is created, otherwise the passed array must be a subclass of
+    :class:`Array` else a TypeError will be raised.
+
+    """
+    if isinstance(array, np.ndarray):
+        array = NumpyArrayAdapter(array)
+
+    elif not isinstance(array, Array):
+        raise TypeError('The given array should be a `biggus.Array` '
+                        'instance, got {}.'.format(type(array)))
+    return array
