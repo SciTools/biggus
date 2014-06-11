@@ -82,6 +82,18 @@ class TestAggregation(unittest.TestCase):
         self._test_aggregation(biggus.var, np.var, ddof=0)
         self._test_aggregation(biggus.var, np.var, ddof=1)
 
+    def test_mean_nd_array(self):
+        r = biggus.mean(np.arange(12), axis=0)
+        self.assertIsInstance(r._array, biggus.NumpyArrayAdapter)
+        self.assertEqual(r.ndarray(), 5.5)
+
+    def test_add_non_supported_type(self):
+        # Check that the Aggregation raises a TypeError
+        # if neither an Array or np.ndarray is given
+        with self.assertRaisesRegexp(AttributeError,
+                                     "list' object has no attribute 'ndim"):
+            biggus.mean(range(10), axis=0)
+
 
 class TestFlow(unittest.TestCase):
     def _test_flow(self, axis):

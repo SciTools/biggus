@@ -14,25 +14,32 @@
 #
 # You should have received a copy of the GNU Lesser General Public License
 # along with Biggus. If not, see <http://www.gnu.org/licenses/>.
-"""Integration tests for swappable engine."""
+"""Unit tests for `biggus.ensure_array`."""
 
 import unittest
 
 import mock
+import numpy as np
+from numpy.testing import assert_array_equal
 
-import biggus
+from biggus import ensure_array, Array, NumpyArrayAdapter
 
 
-class Test(unittest.TestCase):
-    def test(self):
-        # If we switch evaluation engine, does it get used?
-        array = biggus._Aggregation(biggus.ConstantArray(3, 2), None, None,
-                                    None, None, {})
-        return_value = (mock.sentinel.result,)
-        engine = mock.Mock(**{'ndarrays.return_value': return_value})
-        with mock.patch('biggus.engine', engine):
-            result = array.ndarray()
-        self.assertIs(result, mock.sentinel.result)
+class Test_ensure_array(unittest.TestCase):
+    def test_array_instance(self):
+        array = mock.Mock(spec=Array)
+        result = ensure_array(array)
+        self.assertIs(array, result)
+
+    def test_numpy_ndarray_instance(self):
+        array = np.arange(10)
+        result = ensure_array(array)
+        self.assertIsInstance(result, NumpyArrayAdapter)
+        assert_array_equal(array, result.ndarray())
+
+    def test_other_type(self):
+        with self.assertRaises(TypeError):
+            ensure_array(range(10))
 
 
 if __name__ == '__main__':
