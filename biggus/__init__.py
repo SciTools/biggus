@@ -1335,6 +1335,11 @@ class _AggregationStreamsHandler(_StreamsHandler):
 
 
 class _MeanStreamsHandler(_AggregationStreamsHandler):
+    def __init__(self, array, axis, mdtol=1):
+        # The mdtol kwarg not applicable to non-masked arrays
+        # so it is ignored.
+        super(_MeanStreamsHandler, self).__init__(array, axis)
+
     def bootstrap(self, shape):
         self.running_total = np.zeros(shape, dtype=self.array.dtype)
 
@@ -1351,8 +1356,13 @@ class _MeanStreamsHandler(_AggregationStreamsHandler):
 
 
 class _MeanMaskedStreamsHandler(_AggregationStreamsHandler):
+    def __init__(self, array, axis, mdtol=1):
+        self._mdtol = mdtol
+        super(_MeanMaskedStreamsHandler, self).__init__(array, axis)
+
     def bootstrap(self, shape):
         self.running_count = np.zeros(shape, dtype=self.array.dtype)
+        self.running_masked_count = np.zeros(shape, dtype=self.array.dtype)
         self.running_total = np.zeros(shape, dtype=self.array.dtype)
 
     def finalise(self):
@@ -1363,11 +1373,19 @@ class _MeanMaskedStreamsHandler(_AggregationStreamsHandler):
         # Promote array-scalar to 0-dimensional array.
         if array.ndim == 0:
             array = np.ma.array(array)
+        # Apply masked/missing data threshold (mdtol).
+        if self._mdtol < 1:
+            mask_update = np.true_divide(self.running_masked_count,
+                                         self.running_masked_count +
+                                         self.running_count) > self._mdtol
+            array.mask |= mask_update
+
         chunk = Chunk(self.current_keys, array)
         return chunk
 
     def process_data(self, data):
         self.running_count += np.ma.count(data, axis=self.axis)
+        self.running_masked_count += np.ma.count_masked(data, axis=self.axis)
         self.running_total += np.sum(data, axis=self.axis)
 
 
@@ -1569,7 +1587,7 @@ def _normalise_axis(axis, array):
     return axes
 
 
-def mean(a, axis=None):
+def mean(a, axis=None, mdtol=1):
     """
     Request the mean of an Array over any number of axes.
 
@@ -1583,16 +1601,26 @@ def mean(a, axis=None):
                  If axis is a tuple of ints, the operation is performed
                  over multiple axes.
     :type axis: None, or int, or iterable of ints.
+    :param float mdtol: Tolerance of missing data. The value in each
+                        element of the resulting array will be masked if the
+                        fraction of masked data contributing to that element
+                        exceeds mdtol. mdtol=0 means no missing data is
+                        tolerated while mdtol=1 will mean the resulting
+                        element will be masked if and only if all the
+                        contributing elements of the source array are masked.
+                        Defaults to 1.
     :return: The Array representing the requested mean.
     :rtype: Array
 
     """
+    import pdb;pdb.set_trace()
     axes = _normalise_axis(axis, a)
     assert axes is not None and len(axes) == 1
     dtype = (np.array([0], dtype=a.dtype) / 1.).dtype
+    kwargs = dict(mdtol=mdtol)
     return _Aggregation(a, axes[0],
                         _MeanStreamsHandler, _MeanMaskedStreamsHandler,
-                        dtype, {})
+                        dtype, kwargs)
 
 
 def std(a, axis=None, ddof=0):
