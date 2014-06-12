@@ -1613,7 +1613,6 @@ def mean(a, axis=None, mdtol=1):
     :rtype: Array
 
     """
-    import pdb;pdb.set_trace()
     axes = _normalise_axis(axis, a)
     assert axes is not None and len(axes) == 1
     dtype = (np.array([0], dtype=a.dtype) / 1.).dtype

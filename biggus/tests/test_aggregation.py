@@ -1,4 +1,4 @@
-# (C) British Crown Copyright 2013, Met Office
+# (C) British Crown Copyright 2013 - 2014, Met Office
 #
 # This file is part of Biggus.
 #
@@ -17,6 +17,8 @@
 import unittest
 
 import numpy as np
+import numpy.ma
+import numpy.testing
 
 import biggus
 from biggus.tests import AccessCounter
@@ -93,6 +95,81 @@ class TestAggregation(unittest.TestCase):
         with self.assertRaisesRegexp(AttributeError,
                                      "list' object has no attribute 'ndim"):
             biggus.mean(range(10), axis=0)
+
+
+class TestMdtol(unittest.TestCase):
+    def setUp(self):
+        self.data = np.ma.arange(12).reshape(3, 4)
+        self.data[2, 1:] = np.ma.masked
+
+    def _test_mean_with_mdtol(self, data, axis, numpy_result, mdtol=None):
+        data = AccessCounter(data)
+        array = biggus.NumpyArrayAdapter(data)
+
+        # Perform aggregation.
+        if mdtol is None:
+            # Allow testing of default when mdtol is None.
+            biggus_aggregation = biggus.mean(array, axis=axis)
+        else:
+            biggus_aggregation = biggus.mean(array, axis=axis, mdtol=mdtol)
+
+        # Check the aggregation operation doesn't actually read any data.
+        self.assertTrue((data.counts == 0).all())
+
+        # Check results.
+        biggus_result = biggus_aggregation.masked_array()
+        # Check resolving `op_array` to a NumPy array only reads
+        # each relevant source value once.
+        self.assertTrue((data.counts <= 1).all())
+        numpy_mask = np.ma.getmaskarray(numpy_result)
+        biggus_mask = np.ma.getmaskarray(biggus_result)
+        np.testing.assert_array_equal(biggus_mask, numpy_mask)
+        np.testing.assert_array_equal(biggus_result[~biggus_mask].data,
+                                      numpy_result[~numpy_mask].data)
+
+    def test_mean_mdtol_default(self):
+        axis = 0
+        expected = np.ma.mean(self.data, axis)
+        self._test_mean_with_mdtol(self.data, axis, expected)
+
+    def test_mean_mdtol_one(self):
+        axis = 0
+        mdtol = 1
+        expected = np.ma.mean(self.data, axis)
+        self._test_mean_with_mdtol(self.data, axis, expected, mdtol)
+
+    def test_mean_mdtol_zero(self):
+        axis = 0
+        mdtol = 0
+        expected = np.ma.mean(self.data, axis)
+        expected.mask = [False, True, True, True]
+        self._test_mean_with_mdtol(self.data, axis, expected, mdtol)
+
+    def test_mean_mdtol_fraction_below_axis_zero(self):
+        axis = 0
+        mdtol = 0.32
+        expected = np.ma.mean(self.data, axis)
+        expected.mask = [False, True, True, True]
+        self._test_mean_with_mdtol(self.data, axis, expected, mdtol)
+
+    def test_mean_mdtol_fraction_above_axis_zero(self):
+        axis = 0
+        mdtol = 0.34
+        expected = np.ma.mean(self.data, axis)
+        self._test_mean_with_mdtol(self.data, axis, expected, mdtol)
+
+    def test_mean_mdtol_fraction_below_axis_one(self):
+        axis = 1
+        mdtol = 0.74
+        expected = np.ma.mean(self.data, axis)
+        expected.mask = [False, False, True]
+        self._test_mean_with_mdtol(self.data, axis, expected, mdtol)
+
+    def test_mean_mdtol_fraction_above_axis_one(self):
+        axis = 1
+        mdtol = 0.76
+        expected = np.ma.mean(self.data, axis)
+        self._test_mean_with_mdtol(self.data, axis, expected, mdtol)
 
 
 class TestFlow(unittest.TestCase):
