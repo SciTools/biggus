@@ -1335,8 +1335,8 @@ class _AggregationStreamsHandler(_StreamsHandler):
 
 
 class _MeanStreamsHandler(_AggregationStreamsHandler):
-    def __init__(self, array, axis, mdtol=1):
-        # The mdtol kwarg not applicable to non-masked arrays
+    def __init__(self, array, axis, mdtol):
+        # The mdtol argument is not applicable to non-masked arrays
         # so it is ignored.
         super(_MeanStreamsHandler, self).__init__(array, axis)
 
@@ -1356,7 +1356,7 @@ class _MeanStreamsHandler(_AggregationStreamsHandler):
 
 
 class _MeanMaskedStreamsHandler(_AggregationStreamsHandler):
-    def __init__(self, array, axis, mdtol=1):
+    def __init__(self, array, axis, mdtol):
         self._mdtol = mdtol
         super(_MeanMaskedStreamsHandler, self).__init__(array, axis)
 
