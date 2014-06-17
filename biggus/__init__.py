@@ -1334,6 +1334,30 @@ class _AggregationStreamsHandler(_StreamsHandler):
         pass
 
 
+class _CountStreamsHandler(_AggregationStreamsHandler):
+    def bootstrap(self, shape):
+        self.running_count = np.zeros(shape, dtype='i')
+
+    def finalise(self):
+        chunk = Chunk(self.current_keys, self.running_count)
+        return chunk
+
+    def process_data(self, data):
+        self.running_count += data.shape[self.axis]
+
+
+class _CountMaskedStreamsHandler(_AggregationStreamsHandler):
+    def bootstrap(self, shape):
+        self.running_count = np.zeros(shape, dtype='i')
+
+    def finalise(self):
+        chunk = Chunk(self.current_keys, self.running_count)
+        return chunk
+
+    def process_data(self, data):
+        self.running_count += np.ma.count(data, axis=self.axis)
+
+
 class _MeanStreamsHandler(_AggregationStreamsHandler):
     def __init__(self, array, axis, mdtol):
         # The mdtol argument is not applicable to non-masked arrays
@@ -1585,6 +1609,32 @@ def _normalise_axis(axis, array):
         if not all(0 <= axis < array.ndim for axis in axes):
             raise ValueError("'axis' value is out of bounds")
     return axes
+
+
+def count(a, axis=None):
+    """
+    Count the non-masked elements of the array along the given axis.
+
+    .. note:: Currently limited to operating on a single axis.
+
+    :param axis: Axis or axes along which the operation is performed.
+                 The default (axis=None) is to perform the operation
+                 over all the dimensions of the input array.
+                 The axis may be negative, in which case it counts from
+                 the last to the first axis.
+                 If axis is a tuple of ints, the operation is performed
+                 over multiple axes.
+    :type axis: None, or int, or iterable of ints.
+    :return: The Array representing the requested mean.
+    :rtype: Array
+
+    """
+    axes = _normalise_axis(axis, a)
+    assert axes is not None and len(axes) == 1
+    dtype = (np.array([0], dtype=a.dtype) / 1.).dtype
+    return _Aggregation(a, axes[0],
+                        _CountStreamsHandler, _CountMaskedStreamsHandler,
+                        dtype, {})
 
 
 def mean(a, axis=None, mdtol=1):
