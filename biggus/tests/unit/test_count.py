@@ -47,26 +47,26 @@ class TestInvalidAxis(unittest.TestCase):
 
 
 class TestAggregationDtype(unittest.TestCase):
-    def _check(self, source, target):
+    def _check(self, source):
         array = biggus.NumpyArrayAdapter(np.arange(2, dtype=source))
         agg = count(array, axis=0)
-        self.assertEqual(agg.dtype, target)
+        self.assertEqual(agg.dtype, np.dtype('i'))
 
     def test_int_to_float(self):
         dtypes = [np.int8, np.int16, np.int32, np.int]
         for dtype in dtypes:
-            self._check(dtype, np.float)
+            self._check(dtype)
 
     def test_bool_to_float(self):
-        self._check(np.bool, np.float)
+        self._check(np.bool)
 
     def test_floats(self):
         dtypes = [np.float16, np.float32, np.float]
         for dtype in dtypes:
-            self._check(dtype, dtype)
+            self._check(dtype)
 
     def test_complex(self):
-        self._check(np.complex, np.complex)
+        self._check(np.complex)
 
 
 class TestNumpyArrayAdapter(unittest.TestCase):

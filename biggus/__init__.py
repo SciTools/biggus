@@ -1631,10 +1631,9 @@ def count(a, axis=None):
     """
     axes = _normalise_axis(axis, a)
     assert axes is not None and len(axes) == 1
-    dtype = (np.array([0], dtype=a.dtype) / 1.).dtype
     return _Aggregation(a, axes[0],
                         _CountStreamsHandler, _CountMaskedStreamsHandler,
-                        dtype, {})
+                        np.dtype('i'), {})
 
 
 def mean(a, axis=None, mdtol=1):
