@@ -65,6 +65,10 @@ import numpy.ma as ma
 __version__ = '0.6.0-alpha'
 
 
+class AxisSupportError(StandardError):
+    """Raised when the operation is not supported over a given axis/axes."""
+
+
 class Engine(object):
     """
     Represents a way to evaluate lazy expressions.
@@ -1632,7 +1636,9 @@ def count(a, axis=None):
 
     """
     axes = _normalise_axis(axis, a)
-    assert axes is not None and len(axes) == 1
+    if axes is None or len(axes) != 1:
+        msg = "This operation is currently limited to a single axis"
+        raise AxisSupportError(msg)
     return _Aggregation(a, axes[0],
                         _CountStreamsHandler, _CountMaskedStreamsHandler,
                         np.dtype('i'), {})
@@ -1665,7 +1671,9 @@ def mean(a, axis=None, mdtol=1):
 
     """
     axes = _normalise_axis(axis, a)
-    assert axes is not None and len(axes) == 1
+    if axes is None or len(axes) != 1:
+        msg = "This operation is currently limited to a single axis"
+        raise AxisSupportError(msg)
     dtype = (np.array([0], dtype=a.dtype) / 1.).dtype
     kwargs = dict(mdtol=mdtol)
     return _Aggregation(a, axes[0],
@@ -1695,7 +1703,9 @@ def std(a, axis=None, ddof=0):
 
     """
     axes = _normalise_axis(axis, a)
-    assert axes is not None and len(axes) == 1
+    if axes is None or len(axes) != 1:
+        msg = "This operation is currently limited to a single axis"
+        raise AxisSupportError(msg)
     dtype = (np.array([0], dtype=a.dtype) / 1.).dtype
     return _Aggregation(a, axes[0],
                         _StdStreamsHandler, _StdMaskedStreamsHandler,
@@ -1724,7 +1734,9 @@ def var(a, axis=None, ddof=0):
 
     """
     axes = _normalise_axis(axis, a)
-    assert axes is not None and len(axes) == 1
+    if axes is None or len(axes) != 1:
+        msg = "This operation is currently limited to a single axis"
+        raise AxisSupportError(msg)
     dtype = (np.array([0], dtype=a.dtype) / 1.).dtype
     return _Aggregation(a, axes[0],
                         _VarStreamsHandler, _VarMaskedStreamsHandler,
