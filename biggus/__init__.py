@@ -1336,10 +1336,12 @@ class _AggregationStreamsHandler(_StreamsHandler):
 
 class _CountStreamsHandler(_AggregationStreamsHandler):
     def bootstrap(self, shape):
-        self.running_count = np.zeros(shape, dtype='i')
+        self.current_shape = shape
+        self.running_count = 0
 
     def finalise(self):
-        chunk = Chunk(self.current_keys, self.running_count)
+        count = np.ones(self.current_shape, dtype='i') * self.running_count
+        chunk = Chunk(self.current_keys, count)
         return chunk
 
     def process_data(self, data):
