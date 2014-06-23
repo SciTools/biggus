@@ -31,7 +31,7 @@ class TestInvalidAxis(unittest.TestCase):
 
     def test_none(self):
         for func in self.funcs:
-            with self.assertRaises(AssertionError):
+            with self.assertRaises(biggus.AxisSupportError):
                 func(self.array)
 
     def test_too_large(self):
@@ -47,7 +47,7 @@ class TestInvalidAxis(unittest.TestCase):
     def test_multiple(self):
         for func in self.funcs:
             array = biggus.NumpyArrayAdapter(np.arange(12).reshape(3, 4))
-            with self.assertRaises(AssertionError):
+            with self.assertRaises(biggus.AxisSupportError):
                 func(array, axis=(0, 1))
 
 

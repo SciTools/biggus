@@ -29,7 +29,7 @@ class TestInvalidAxis(unittest.TestCase):
         self.array = biggus.NumpyArrayAdapter(np.arange(12))
 
     def test_none(self):
-        with self.assertRaises(AssertionError):
+        with self.assertRaises(biggus.AxisSupportError):
             mean(self.array)
 
     def test_too_large(self):
@@ -42,7 +42,7 @@ class TestInvalidAxis(unittest.TestCase):
 
     def test_multiple(self):
         array = biggus.NumpyArrayAdapter(np.arange(12).reshape(3, 4))
-        with self.assertRaises(AssertionError):
+        with self.assertRaises(biggus.AxisSupportError):
             mean(array, axis=(0, 1))
 
 
