@@ -62,7 +62,7 @@ import numpy as np
 import numpy.ma as ma
 
 
-__version__ = '0.6.0-alpha'
+__version__ = '0.6.0'
 
 
 class AxisSupportError(StandardError):
