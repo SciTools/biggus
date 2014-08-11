@@ -1573,8 +1573,15 @@ class _Aggregation(ComputedArray):
 
     def __getitem__(self, keys):
         keys = self._normalise_keys(keys)
-        keys = (slice(None),) + keys
-        return _Aggregation(self._array[keys], self._axis,
+        # Insert an ':' into these keys to get keys for self._array.
+        keys = list(keys)
+        keys[self._axis:self._axis] = [slice(None)]
+        keys = tuple(keys)
+        # Reduce the aggregation-axis by the number of prior dimensions that
+        # get removed by the indexing operation.
+        result_axis = self._axis - sum([isinstance(key, (int, np.integer))
+                                        for key in keys[:self._axis]])
+        return _Aggregation(self._array[keys], result_axis,
                             self._streams_handler_class,
                             self._masked_streams_handler_class,
                             self.dtype,

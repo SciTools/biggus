@@ -36,42 +36,41 @@ class TestAggregation(unittest.TestCase):
             [(500, 30, 40), [slice(3, 6)]],
             [(500, 30, 40), [(slice(None), slice(3, 6))]],
         ]
-        axis = 0
-        ddof = 0
         for shape, cuts in tests:
             # Define some test data
             size = np.prod(shape)
             raw_data = np.linspace(0, 1, num=size).reshape(shape)
 
-            # Check the aggregation operation doesn't actually read any
-            # data.
-            data = AccessCounter(raw_data)
-            array = biggus.NumpyArrayAdapter(data)
-            op_array = biggus_op(array, axis=0, **kwargs)
-            self.assertIsInstance(op_array, biggus.Array)
-            self.assertTrue((data.counts == 0).all())
-
-            # Compute the NumPy aggregation, and then wrap the result as
-            # an array so we can apply biggus-style indexing.
-            numpy_op_data = numpy_op(raw_data, axis=axis, **kwargs)
-            numpy_op_array = biggus.NumpyArrayAdapter(numpy_op_data)
-
-            for keys in cuts:
-                # Check slicing doesn't actually read any data.
-                op_array = op_array[keys]
+            for axis in range(len(shape)):
+                # Check the aggregation operation doesn't actually read any
+                # data.
+                data = AccessCounter(raw_data)
+                array = biggus.NumpyArrayAdapter(data)
+                op_array = biggus_op(array, axis=axis, **kwargs)
                 self.assertIsInstance(op_array, biggus.Array)
                 self.assertTrue((data.counts == 0).all())
-                # Update the NumPy result to match
-                numpy_op_array = numpy_op_array[keys]
 
-            # Check resolving `op_array` to a NumPy array only reads
-            # each relevant source value once.
-            op_result = op_array.ndarray()
-            self.assertTrue((data.counts <= 1).all())
+                # Compute the NumPy aggregation, and then wrap the result as
+                # an array so we can apply biggus-style indexing.
+                numpy_op_data = numpy_op(raw_data, axis=axis, **kwargs)
+                numpy_op_array = biggus.NumpyArrayAdapter(numpy_op_data)
 
-            # Check the NumPy and biggus numeric values match.
-            numpy_result = numpy_op_array.ndarray()
-            np.testing.assert_array_almost_equal(op_result, numpy_result)
+                for keys in cuts:
+                    # Check slicing doesn't actually read any data.
+                    op_array = op_array[keys]
+                    self.assertIsInstance(op_array, biggus.Array)
+                    self.assertTrue((data.counts == 0).all())
+                    # Update the NumPy result to match
+                    numpy_op_array = numpy_op_array[keys]
+
+                # Check resolving `op_array` to a NumPy array only reads
+                # each relevant source value once.
+                op_result = op_array.ndarray()
+                self.assertTrue((data.counts <= 1).all())
+
+                # Check the NumPy and biggus numeric values match.
+                numpy_result = numpy_op_array.ndarray()
+                np.testing.assert_array_almost_equal(op_result, numpy_result)
 
     def test_mean(self):
         self._test_aggregation(biggus.mean, np.mean)
