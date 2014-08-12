@@ -65,6 +65,14 @@ import numpy.ma as ma
 __version__ = '0.7.0-alpha'
 
 
+_SCALAR_KEY_TYPES = (int, np.integer)
+_KEY_TYPES = _SCALAR_KEY_TYPES + (slice, tuple, np.ndarray)
+
+
+def _is_scalar(key):
+    return isinstance(key, (int, np.integer))
+
+
 class AxisSupportError(StandardError):
     """Raised when the operation is not supported over a given axis/axes."""
 
@@ -525,8 +533,7 @@ class Array(object):
         if len(keys) > self.ndim:
             raise IndexError('too many keys')
         for key in keys:
-            if not(isinstance(key, (int, np.integer,
-                                    slice, tuple, np.ndarray))):
+            if not(isinstance(key, _KEY_TYPES)):
                 raise TypeError('invalid index: {!r}'.format(key))
         return keys
 
@@ -673,7 +680,7 @@ class _ArrayAdapter(Array):
         Raises IndexError/TypeError for invalid keys.
 
         """
-        if isinstance(key, (int, np.integer)):
+        if _is_scalar(key):
             if key >= size or key < -size:
                 msg = 'index {0} is out of bounds for axis {1} with' \
                       ' size {2}'.format(key, axis, size)
@@ -703,7 +710,7 @@ class _ArrayAdapter(Array):
 
         """
         size = len(indices)
-        if isinstance(new_key, (int, np.integer)):
+        if _is_scalar(new_key):
             if new_key >= size or new_key < -size:
                 msg = 'index {0} is out of bounds for axis {1}' \
                       ' with size {2}'.format(new_key, axis, size)
@@ -740,7 +747,7 @@ class _ArrayAdapter(Array):
         while src_keys and new_keys:
             src_size = shape.pop(0)
             src_key = src_keys.pop(0)
-            if isinstance(src_key, (int, np.integer)):
+            if _is_scalar(src_key):
                 # An integer src_key means this dimension has
                 # already been sliced away - it's not visible to
                 # the new keys.
@@ -837,8 +844,7 @@ class NumpyArrayAdapter(_ArrayAdapter):
                 for i, key in tuple_keys:
                     cut_keys[i] = slice(None)
                 array = self.concrete[tuple(cut_keys)]
-                is_scalar = [isinstance(key, (int, np.integer))
-                             for key in cut_keys]
+                is_scalar = map(_is_scalar, cut_keys)
                 dimensions -= np.cumsum(is_scalar)
             else:
                 # Use ellipsis indexing to ensure we have a real ndarray
@@ -977,7 +983,7 @@ class ArrayStack(Array):
     def __setitem__(self, keys, value):
         assert len(keys) == self._stack.ndim
         for key in keys:
-            assert isinstance(key, (int, np.integer))
+            assert _is_scalar(key)
         assert isinstance(value, Array), type(value)
         self._stack[keys] = value
 
@@ -1130,15 +1136,14 @@ class LinearMosaic(Array):
             # then it's safe to just pass the keys to each tile.
             tile = self._tiles[0]
             tiles = [tile[keys] for tile in self._tiles]
-            f = lambda key: isinstance(key, (int, np.integer))
-            scalar_keys = filter(f, keys)
+            scalar_keys = filter(_is_scalar, keys)
             result = LinearMosaic(tiles, axis - len(scalar_keys))
         else:
             axis_lengths = [tile.shape[axis] for tile in self._tiles]
             offsets = np.cumsum([0] + axis_lengths[:-1])
             splits = offsets - 1
             axis_key = keys[axis]
-            if isinstance(axis_key, (int, np.integer)):
+            if _is_scalar(axis_key):
                 # Find the single relevant tile
                 tile_index = np.searchsorted(splits, axis_key) - 1
                 tile = self._tiles[tile_index]
@@ -1579,8 +1584,7 @@ class _Aggregation(ComputedArray):
         keys = tuple(keys)
         # Reduce the aggregation-axis by the number of prior dimensions that
         # get removed by the indexing operation.
-        result_axis = self._axis - sum([isinstance(key, (int, np.integer))
-                                        for key in keys[:self._axis]])
+        result_axis = self._axis - sum(map(_is_scalar, keys[:self._axis]))
         return _Aggregation(self._array[keys], result_axis,
                             self._streams_handler_class,
                             self._masked_streams_handler_class,
@@ -1609,11 +1613,11 @@ def _normalise_axis(axis, array):
     # TypeError/ValueError.
     if axis is None:
         axes = None
-    elif isinstance(axis, (int, np.integer)):
+    elif _is_scalar(axis):
         axes = (axis,)
     elif (isinstance(axis, collections.Iterable) and
             not isinstance(axis, (basestring, collections.Mapping)) and
-            all(map(lambda x: isinstance(x, (int, np.integer)), axis))):
+            all(map(_is_scalar, axis))):
         axes = tuple(axis)
     else:
         raise TypeError('axis must be None, int, or iterable of ints')
@@ -1852,7 +1856,7 @@ def _sliced_shape(shape, keys):
     sliced_shape = []
     # TODO: Watch out for more keys than shape entries.
     for size, key in itertools.izip_longest(shape, keys):
-        if isinstance(key, (int, np.integer)):
+        if _is_scalar(key):
             continue
         elif isinstance(key, slice):
             size = len(range(*key.indices(size)))
