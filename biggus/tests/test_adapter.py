@@ -97,6 +97,33 @@ class _TestAdapter(object):
                 (2, 3, 15, 40)],
             [(21, 5, 2, 70, 30, 40), [(0, (1, 4), 1, (2, 5, 10),
                                        slice(None, 15))], (2, 3, 15, 40)],
+            # Boolean indexing
+            [(3, 4), [np.array([0, 1, 0], dtype=bool)], (1, 4)],
+            [(3, 4), [np.array([1, 0, 1], dtype=bool)], (2, 4)],
+            [(3, 4), [np.array([0, 0, 0], dtype=bool)], (0, 4)],
+            [(3, 4), [np.array([1, 1, 1], dtype=bool)], (3, 4)],
+            [(3, 4), [(slice(None), np.array([1, 0, 1, 1], dtype=bool))],
+             (3, 3)],
+            [(3, 4), [(slice(None), np.array([0, 1, 0, 0], dtype=bool))],
+             (3, 1)],
+            [(3, 4), [(slice(None), np.array([1, 1, 1, 1], dtype=bool))],
+             (3, 4)],
+            [(3, 4), [(slice(None), np.array([0, 0, 0, 0], dtype=bool))],
+             (3, 0)],
+            # Boolean indexing (too few indices - zero pad)
+            [(3, 4), [np.array([1, 1], dtype=bool)], (2, 4)],
+            [(3, 4), [(slice(None), np.array([1, 1, 1], dtype=bool))], (3, 3)],
+            # Boolean indexing (too many indices)
+            [(3, 4), [np.array([1, 1, 1, 0], dtype=bool)], IndexError],
+            [(3, 4), [(slice(None), np.array([1, 1, 1, 1, 0], dtype=bool))],
+             IndexError],
+            # Boolean testing, repeated slicing
+            [(3, 4), [(slice(None), slice(None)),
+                      np.array([0, 1, 0], dtype=bool)], (1, 4)],
+            [(3, 4), [(slice(None), slice(None)),
+                      (slice(None), slice(None)),
+                      np.array([0, 1, 1], dtype=bool),
+                      np.array([1, 0], dtype=bool)], (1, 4)],
         ]
         for src_shape, cuts, target in tests:
             array = self.zeros_adapter(src_shape)

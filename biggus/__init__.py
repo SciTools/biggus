@@ -687,6 +687,12 @@ class _ArrayAdapter(Array):
                 raise IndexError(msg)
         elif isinstance(key, slice):
             pass
+        elif isinstance(key, np.ndarray) and key.dtype == np.dtype('bool'):
+            if key.size > size:
+                msg = 'too many boolean indices. Boolean index array ' \
+                      'of size {0} is greater than axis {1} with ' \
+                      'size {2}'.format(key.size, axis, size)
+                raise IndexError(msg)
         elif isinstance(key, collections.Iterable) and \
                 not isinstance(key, basestring):
             # Make sure we capture the values in case we've
@@ -718,6 +724,15 @@ class _ArrayAdapter(Array):
             result_key = indices[new_key]
         elif isinstance(new_key, slice):
             result_key = indices.__getitem__(new_key)
+        elif isinstance(new_key, np.ndarray) and \
+                new_key.dtype == np.dtype('bool'):
+            # Numpy boolean indexing.
+            if new_key.size > size:
+                msg = 'too many boolean indices. Boolean index array ' \
+                      'of size {0} is greater than axis {1} with ' \
+                      'size {2}'.format(new_key.size, axis, size)
+                raise IndexError(msg)
+            result_key = tuple(np.array(indices)[new_key])
         elif isinstance(new_key, collections.Iterable) and \
                 not isinstance(new_key, basestring):
             # Make sure we capture the values in case we've
@@ -1861,6 +1876,9 @@ def _sliced_shape(shape, keys):
         elif isinstance(key, slice):
             size = len(range(*key.indices(size)))
             sliced_shape.append(size)
+        elif isinstance(key, np.ndarray) and key.dtype == np.dtype('bool'):
+            # Numpy boolean indexing.
+            sliced_shape.append(sum(key))
         elif isinstance(key, (tuple, np.ndarray)):
             sliced_shape.append(len(key))
         else:
