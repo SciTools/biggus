@@ -53,6 +53,7 @@ For example::
 from __future__ import division
 
 from abc import ABCMeta, abstractproperty, abstractmethod
+import __builtin__
 import collections
 import itertools
 import threading
@@ -1384,6 +1385,102 @@ class _CountMaskedStreamsHandler(_AggregationStreamsHandler):
         self.running_count += np.ma.count(data, axis=self.axis)
 
 
+class _MinStreamsHandler(_AggregationStreamsHandler):
+    def bootstrap(self, shape):
+        self.result = np.zeros(shape, dtype=self.array.dtype)
+
+    def finalise(self):
+        array = self.result
+        # Promote array-scalar to 0-dimensional array.
+        if array.ndim == 0:
+            array = np.array(array)
+        chunk = Chunk(self.current_keys, array)
+        return chunk
+
+    def process_data(self, data):
+        self.result = np.min(data, axis=self.axis)
+
+
+class _MinMaskedStreamsHandler(_AggregationStreamsHandler):
+    def bootstrap(self, shape):
+        self.result = np.zeros(shape, dtype=self.array.dtype)
+
+    def finalise(self):
+        array = self.result
+        # Promote array-scalar to 0-dimensional array.
+        if array.ndim == 0:
+            array = np.ma.array(array)
+        chunk = Chunk(self.current_keys, array)
+        return chunk
+
+    def process_data(self, data):
+        self.result = np.min(data, axis=self.axis)
+
+
+class _MaxStreamsHandler(_AggregationStreamsHandler):
+    def bootstrap(self, shape):
+        self.result = np.zeros(shape, dtype=self.array.dtype)
+
+    def finalise(self):
+        array = self.result
+        # Promote array-scalar to 0-dimensional array.
+        if array.ndim == 0:
+            array = np.array(array)
+        chunk = Chunk(self.current_keys, array)
+        return chunk
+
+    def process_data(self, data):
+        self.result = np.max(data, axis=self.axis)
+
+
+class _MaxMaskedStreamsHandler(_AggregationStreamsHandler):
+    def bootstrap(self, shape):
+        self.result = np.zeros(shape, dtype=self.array.dtype)
+
+    def finalise(self):
+        array = self.result
+        # Promote array-scalar to 0-dimensional array.
+        if array.ndim == 0:
+            array = np.ma.array(array)
+        chunk = Chunk(self.current_keys, array)
+        return chunk
+
+    def process_data(self, data):
+        self.result = np.max(data, axis=self.axis)
+
+
+class _SumStreamsHandler(_AggregationStreamsHandler):
+    def bootstrap(self, shape):
+        self.running_total = np.zeros(shape, dtype=self.array.dtype)
+
+    def finalise(self):
+        array = self.running_total
+        # Promote array-scalar to 0-dimensional array.
+        if array.ndim == 0:
+            array = np.array(array)
+        chunk = Chunk(self.current_keys, array)
+        return chunk
+
+    def process_data(self, data):
+        self.running_total += np.sum(data, axis=self.axis)
+
+
+class _SumMaskedStreamsHandler(_AggregationStreamsHandler):
+    def bootstrap(self, shape):
+        self.running_total = np.ma.zeros(shape, dtype=self.array.dtype)
+
+    def finalise(self):
+        array = self.running_total
+        # Promote array-scalar to 0-dimensional array.
+        if array.ndim == 0:
+            array = np.ma.array(array)
+        chunk = Chunk(self.current_keys, array)
+        return chunk
+
+    def process_data(self, data):
+        self.running_total += np.sum(data, axis=self.axis)
+
+
 class _MeanStreamsHandler(_AggregationStreamsHandler):
     def __init__(self, array, axis, mdtol):
         # The mdtol argument is not applicable to non-masked arrays
@@ -1599,7 +1696,8 @@ class _Aggregation(ComputedArray):
         keys = tuple(keys)
         # Reduce the aggregation-axis by the number of prior dimensions that
         # get removed by the indexing operation.
-        result_axis = self._axis - sum(map(_is_scalar, keys[:self._axis]))
+        scalar_axes = map(_is_scalar, keys[:self._axis])
+        result_axis = self._axis - __builtin__.sum(scalar_axes)
         return _Aggregation(self._array[keys], result_axis,
                             self._streams_handler_class,
                             self._masked_streams_handler_class,
@@ -1668,6 +1766,93 @@ def count(a, axis=None):
     return _Aggregation(a, axes[0],
                         _CountStreamsHandler, _CountMaskedStreamsHandler,
                         np.dtype('i'), {})
+
+
+def min(a, axis=None):
+    """
+    Request the minimum of an Array over any number of axes.
+
+    .. note:: Currently limited to operating on a single axis.
+
+    Parameters
+    ----------
+    a : Array object
+        The object whose minimum is to be found.
+    axis : None, or int, or iterable of ints
+        Axis or axes along which the operation is performed. The default
+        (axis=None) is to perform the operation over all the dimensions of the
+        input array. The axis may be negative, in which case it counts from
+        the last to the first axis. If axis is a tuple of ints, the operation
+        is performed over multiple axes.
+
+    Returns
+    -------
+    out : Array
+        The Array representing the requested mean.
+    """
+    axes = _normalise_axis(axis, a)
+    assert axes is not None and len(axes) == 1
+    return _Aggregation(a, axes[0],
+                        _MinStreamsHandler, _MinMaskedStreamsHandler,
+                        a.dtype, {})
+
+
+def max(a, axis=None):
+    """
+    Request the maximum of an Array over any number of axes.
+
+    .. note:: Currently limited to operating on a single axis.
+
+    Parameters
+    ----------
+    a : Array object
+        The object whose maximum is to be found.
+    axis : None, or int, or iterable of ints
+        Axis or axes along which the operation is performed. The default
+        (axis=None) is to perform the operation over all the dimensions of the
+        input array. The axis may be negative, in which case it counts from
+        the last to the first axis. If axis is a tuple of ints, the operation
+        is performed over multiple axes.
+
+    Returns
+    -------
+    out : Array
+        The Array representing the requested max.
+    """
+    axes = _normalise_axis(axis, a)
+    assert axes is not None and len(axes) == 1
+    return _Aggregation(a, axes[0],
+                        _MaxStreamsHandler, _MaxMaskedStreamsHandler,
+                        a.dtype, {})
+
+
+def sum(a, axis=None):
+    """
+    Request the sum of an Array over any number of axes.
+
+    .. note:: Currently limited to operating on a single axis.
+
+    Parameters
+    ----------
+    a : Array object
+        The object whose summation is to be found.
+    axis : None, or int, or iterable of ints
+        Axis or axes along which the operation is performed. The default
+        (axis=None) is to perform the operation over all the dimensions of the
+        input array. The axis may be negative, in which case it counts from
+        the last to the first axis. If axis is a tuple of ints, the operation
+        is performed over multiple axes.
+
+    Returns
+    -------
+    out : Array
+        The Array representing the requested sum.
+    """
+    axes = _normalise_axis(axis, a)
+    assert axes is not None and len(axes) == 1
+    return _Aggregation(a, axes[0],
+                        _SumStreamsHandler, _SumMaskedStreamsHandler,
+                        a.dtype, {})
 
 
 def mean(a, axis=None, mdtol=1):
@@ -1878,7 +2063,7 @@ def _sliced_shape(shape, keys):
             sliced_shape.append(size)
         elif isinstance(key, np.ndarray) and key.dtype == np.dtype('bool'):
             # Numpy boolean indexing.
-            sliced_shape.append(sum(key))
+            sliced_shape.append(__builtin__.sum(key))
         elif isinstance(key, (tuple, np.ndarray)):
             sliced_shape.append(len(key))
         else:
