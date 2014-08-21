@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name='Biggus',
-    version='0.7.0-alpha',
+    version='0.7.0',
     url='https://github.com/SciTools/biggus',
     author='Richard Hattersley',
     author_email='rhattersley@gmail.com',
