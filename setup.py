@@ -6,7 +6,8 @@ setup(
     url='https://github.com/SciTools/biggus',
     author='Richard Hattersley',
     author_email='rhattersley@gmail.com',
-    packages=['biggus', 'biggus.tests'],
+    packages=['biggus', 'biggus.tests', 'biggus.tests.integration',
+              'biggus.tests.unit'],
     classifiers=['License :: OSI Approved :: '
                  'GNU Lesser General Public License v3 (LGPLv3)',
                  'Programming Language :: Python :: 2',

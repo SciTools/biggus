@@ -1,3 +1,4 @@
 # Top-level files
 include COPYING COPYING.LESSER README.rst
-
+include requirements.txt requirements-sphinx.txt
+include doc/Makefile doc/make.bat doc/*.rst doc/*.py
