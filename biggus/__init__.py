@@ -557,7 +557,7 @@ class ConstantArray(Array):
     Returns
     -------
     Array
-        An Array entirely filled with ones.
+        An Array entirely filled with 'value'.
 
     """
     def __init__(self, shape, value=0.0, dtype=None):
