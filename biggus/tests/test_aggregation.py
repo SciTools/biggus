@@ -91,8 +91,8 @@ class TestAggregation(unittest.TestCase):
     def test_add_non_supported_type(self):
         # Check that the Aggregation raises a TypeError
         # if neither an Array or np.ndarray is given
-        with self.assertRaisesRegexp(AttributeError,
-                                     "list' object has no attribute 'ndim"):
+        msg = "list' object has no attribute 'ndim"
+        with self.assertRaisesRegexp(AttributeError, msg):
             biggus.mean(range(10), axis=0)
 
 
