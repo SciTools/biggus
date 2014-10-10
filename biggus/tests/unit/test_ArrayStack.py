@@ -50,14 +50,14 @@ class Test___init___fill_values(unittest.TestCase):
     def test_nan_number(self):
         array1 = fake_array(np.nan)
         array2 = fake_array(42)
-        with self.assertRaises(ValueError):
-            ArrayStack(np.array([array1, array2]))
+        stack = ArrayStack(np.array([array1, array2]))
+        self.assertEqual(stack.fill_value, 1e+20)
 
     def test_number_nan(self):
         array1 = fake_array(42)
         array2 = fake_array(np.nan)
-        with self.assertRaises(ValueError):
-            ArrayStack(np.array([array1, array2]))
+        stack = ArrayStack(np.array([array1, array2]))
+        self.assertEqual(stack.fill_value, 1e+20)
 
     def test_number_number(self):
         array1 = fake_array(42)
@@ -68,8 +68,8 @@ class Test___init___fill_values(unittest.TestCase):
     def test_number_other_number(self):
         array1 = fake_array(42)
         array2 = fake_array(43)
-        with self.assertRaises(ValueError):
-            ArrayStack(np.array([array1, array2]))
+        stack = ArrayStack(np.array([array1, array2]))
+        self.assertEqual(stack.fill_value, 1e+20)
 
     def test_matching_strings(self):
         array1 = fake_array('foo', np.dtype('S3'))
@@ -80,8 +80,8 @@ class Test___init___fill_values(unittest.TestCase):
     def test_different_strings(self):
         array1 = fake_array('foo', np.dtype('S3'))
         array2 = fake_array('bar', np.dtype('S3'))
-        with self.assertRaises(ValueError):
-            ArrayStack(np.array([array1, array2]))
+        stack = ArrayStack(np.array([array1, array2]))
+        self.assertEqual(stack.fill_value, 'N/A')
 
 
 class Test_multidim_array_stack(unittest.TestCase):

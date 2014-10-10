@@ -951,6 +951,7 @@ class ArrayStack(Array):
         item_shape = first_array.shape
         dtype = first_array.dtype
         fill_value = first_array.fill_value
+
         if np.issubdtype(dtype, np.floating):
             def fill_value_ok(array):
                 return array.fill_value == fill_value or (
@@ -958,18 +959,23 @@ class ArrayStack(Array):
         else:
             def fill_value_ok(array):
                 return array.fill_value == fill_value
+
         for array in stack.flat:
             if not isinstance(array, Array):
                 raise ValueError('sub-array must be subclass of Array')
-            ok = (array.shape == item_shape and array.dtype == dtype and
-                  fill_value_ok(array))
+            if fill_value is not None and not fill_value_ok(array):
+                fill_value = None
+            ok = array.shape == item_shape and array.dtype == dtype
             if not ok:
                 raise ValueError('invalid sub-array')
 
         self._stack = stack
         self._item_shape = item_shape
         self._dtype = dtype
-        self._fill_value = fill_value
+        if fill_value is None:
+            self._fill_value = np.ma.empty(0, dtype=dtype).fill_value
+        else:
+            self._fill_value = fill_value
 
     @property
     def dtype(self):
@@ -1129,11 +1135,16 @@ class LinearMosaic(Array):
                 raise ValueError('inconsistent tile shapes')
             if tile.dtype != common_dtype:
                 raise ValueError('inconsistent tile dtypes')
-            if not fill_value_ok(tile):
-                raise ValueError('inconsistent tile fill_values')
+            if common_fill_value is not None and not fill_value_ok(tile):
+                common_fill_value = None
+
         self._tiles = tiles
         self._axis = axis
         self._cached_shape = None
+        if common_fill_value is None:
+            self._fill_value = np.ma.empty(0, dtype=common_dtype).fill_value
+        else:
+            self._fill_value = common_fill_value
 
     @property
     def dtype(self):
@@ -1141,7 +1152,7 @@ class LinearMosaic(Array):
 
     @property
     def fill_value(self):
-        return self._tiles[0].fill_value
+        return self._fill_value
 
     @property
     def shape(self):
