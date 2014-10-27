@@ -938,8 +938,15 @@ class ArrayStack(Array):
     """
     An Array made from a homogeneous array of other Arrays.
 
+    Parameters
+    ----------
+    stack : array-like
+        The array of Arrays to be stacked, where each Array must be of
+        the same shape.
+
     """
     def __init__(self, stack):
+        stack = np.require(stack, dtype='O')
         first_array = stack.flat[0]
         item_shape = first_array.shape
         dtype = first_array.dtype
@@ -1044,6 +1051,8 @@ class ArrayStack(Array):
             where each Array in the stack must be of the same shape.
 
         """
+        arrays = np.require(arrays, dtype='O')
+
         order = order.lower()
 
         # Ensure a suitable shape has been specified.

@@ -65,7 +65,7 @@ class TestWritePattern(unittest.TestCase):
     def test_large(self):
         # Source data: 15 GB
         small_array = self._small_array()
-        array = biggus.ArrayStack(np.array([[small_array] * 1000] * 5))
+        array = biggus.ArrayStack([[small_array] * 1000] * 5)
         target = _WriteCounter(array.shape)
         biggus.save([array], [target])
         self.assertTrue(target.all_written())

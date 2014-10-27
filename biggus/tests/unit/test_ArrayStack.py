@@ -86,7 +86,7 @@ class Test___init___fill_values(unittest.TestCase):
 
 class Test_multidim_array_stack(unittest.TestCase):
     def setUp(self):
-        self.arrays = np.array([ConstantArray((), i) for i in range(6)])
+        self.arrays = [ConstantArray((), i) for i in range(6)]
 
     def test_stack_order_c_numpy_array_t1(self):
         # 1D stack of arrays shape (6,)
@@ -101,14 +101,6 @@ class Test_multidim_array_stack(unittest.TestCase):
         res = ArrayStack.multidim_array_stack(self.arrays, (2, 3), order='C')
         arr = np.array([i for i in range(6)])
         target = np.reshape(arr, (2, 3), order='C')
-        self.assertTrue(np.array_equal(res.ndarray(), target))
-
-    def test_stack_order_c_list(self):
-        # 1D stack of arrays length  6
-        res = ArrayStack.multidim_array_stack(self.arrays.tolist(), (3, 2),
-                                              order='C')
-        arr = np.array([i for i in range(6)])
-        target = np.reshape(arr, (3, 2), order='C')
         self.assertTrue(np.array_equal(res.ndarray(), target))
 
     def test_stack_order_c_multidim(self):
@@ -154,8 +146,7 @@ class Test_multidim_array_stack(unittest.TestCase):
 
     def test_multidim_stack_multidim(self):
         # Multidim stack of arrays shape (4, 6)
-        arrays = np.array([[ConstantArray((), i) for i in range(6)] for
-                           i in range(4)])
+        arrays = [[ConstantArray((), i) for i in range(6)] for i in range(4)]
         msg = 'multidimensional stacks not yet supported'
         with self.assertRaisesRegexp(ValueError, msg):
             ArrayStack.multidim_array_stack(arrays, (3, 2, 4))
