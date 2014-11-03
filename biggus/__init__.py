@@ -288,6 +288,8 @@ class ConsumerNode(Node):
                 if any(chunk is QUEUE_FINISHED for chunk in input_chunks):
                     break
                 self.output(self.process_chunks(input_chunks))
+            # Finalise the final chunk (process_chunks does this for all
+            # but the last chunk).
             self.output(self.finalise())
         except:
             self.abort()
@@ -1332,6 +1334,12 @@ class _StreamsHandler(object):
 
     @abstractmethod
     def finalise(self):
+        """
+        Once a chunk has been processed, this method will be called to
+        complete any remaining computation and return a "result chunk"
+        (which itself could very well go on for further processing).
+
+        """
         pass
 
     @abstractmethod
@@ -1350,7 +1358,19 @@ class _AggregationStreamsHandler(_StreamsHandler):
         self.current_keys = None
 
     @abstractmethod
-    def bootstrap(self, data):
+    def bootstrap(self, processed_chunk_shape):
+        """
+        Initialise the processing of the next chunk.
+
+        Parameters
+        ----------
+        processed_chunk_shape : list
+            The shape that the current chunk will have once it has
+            been computed. For example, for an aggregation of a chunk of
+            shape ``(x, y, z)``, over axis 1, ``the processed_chunk_shape``
+            would be ``[x, z]``.
+
+        """
         pass
 
     def input_iteration_order(self, iteration_order):
@@ -1363,12 +1383,17 @@ class _AggregationStreamsHandler(_StreamsHandler):
         keys = list(chunk.keys)
         del keys[self.axis]
         result = None
+        # If this chunk is a new source of data, do appropriate finalisation
+        # of the previous chunk and initialise this one.
         if keys != self.current_keys:
-            shape = list(chunk.data.shape)
-            del shape[self.axis]
-            self.current_shape = shape
+            # If this isn't the first time this method has been called,
+            # finalise any data which is waiting to be dealt with.
             if self.current_keys is not None:
                 result = self.finalise()
+
+            # Setup the processing of this new chunk.
+            shape = list(chunk.data.shape)
+            del shape[self.axis]
             self.bootstrap(shape)
             self.current_keys = keys
         self.process_data(chunk.data)
@@ -1380,8 +1405,8 @@ class _AggregationStreamsHandler(_StreamsHandler):
 
 
 class _CountStreamsHandler(_AggregationStreamsHandler):
-    def bootstrap(self, shape):
-        self.current_shape = shape
+    def bootstrap(self, processed_chunk_shape):
+        self.current_shape = processed_chunk_shape
         self.running_count = 0
 
     def finalise(self):
@@ -1394,8 +1419,8 @@ class _CountStreamsHandler(_AggregationStreamsHandler):
 
 
 class _CountMaskedStreamsHandler(_AggregationStreamsHandler):
-    def bootstrap(self, shape):
-        self.running_count = np.zeros(shape, dtype='i')
+    def bootstrap(self, processed_chunk_shape):
+        self.running_count = np.zeros(processed_chunk_shape, dtype='i')
 
     def finalise(self):
         chunk = Chunk(self.current_keys, self.running_count)
@@ -1406,8 +1431,8 @@ class _CountMaskedStreamsHandler(_AggregationStreamsHandler):
 
 
 class _MinStreamsHandler(_AggregationStreamsHandler):
-    def bootstrap(self, shape):
-        self.result = np.zeros(shape, dtype=self.array.dtype)
+    def bootstrap(self, processed_chunk_shape):
+        self.result = np.zeros(processed_chunk_shape, dtype=self.array.dtype)
 
     def finalise(self):
         array = self.result
@@ -1422,8 +1447,8 @@ class _MinStreamsHandler(_AggregationStreamsHandler):
 
 
 class _MinMaskedStreamsHandler(_AggregationStreamsHandler):
-    def bootstrap(self, shape):
-        self.result = np.zeros(shape, dtype=self.array.dtype)
+    def bootstrap(self, processed_chunk_shape):
+        self.result = np.zeros(processed_chunk_shape, dtype=self.array.dtype)
 
     def finalise(self):
         array = self.result
@@ -1438,8 +1463,8 @@ class _MinMaskedStreamsHandler(_AggregationStreamsHandler):
 
 
 class _MaxStreamsHandler(_AggregationStreamsHandler):
-    def bootstrap(self, shape):
-        self.result = np.zeros(shape, dtype=self.array.dtype)
+    def bootstrap(self, processed_chunk_shape):
+        self.result = np.zeros(processed_chunk_shape, dtype=self.array.dtype)
 
     def finalise(self):
         array = self.result
@@ -1454,8 +1479,8 @@ class _MaxStreamsHandler(_AggregationStreamsHandler):
 
 
 class _MaxMaskedStreamsHandler(_AggregationStreamsHandler):
-    def bootstrap(self, shape):
-        self.result = np.zeros(shape, dtype=self.array.dtype)
+    def bootstrap(self, processed_chunk_shape):
+        self.result = np.zeros(processed_chunk_shape, dtype=self.array.dtype)
 
     def finalise(self):
         array = self.result
@@ -1470,8 +1495,9 @@ class _MaxMaskedStreamsHandler(_AggregationStreamsHandler):
 
 
 class _SumStreamsHandler(_AggregationStreamsHandler):
-    def bootstrap(self, shape):
-        self.running_total = np.zeros(shape, dtype=self.array.dtype)
+    def bootstrap(self, processed_chunk_shape):
+        self.running_total = np.zeros(processed_chunk_shape,
+                                      dtype=self.array.dtype)
 
     def finalise(self):
         array = self.running_total
@@ -1486,8 +1512,9 @@ class _SumStreamsHandler(_AggregationStreamsHandler):
 
 
 class _SumMaskedStreamsHandler(_AggregationStreamsHandler):
-    def bootstrap(self, shape):
-        self.running_total = np.ma.zeros(shape, dtype=self.array.dtype)
+    def bootstrap(self, processed_chunk_shape):
+        self.running_total = np.ma.zeros(processed_chunk_shape,
+                                         dtype=self.array.dtype)
 
     def finalise(self):
         array = self.running_total
@@ -1507,8 +1534,9 @@ class _MeanStreamsHandler(_AggregationStreamsHandler):
         # so it is ignored.
         super(_MeanStreamsHandler, self).__init__(array, axis)
 
-    def bootstrap(self, shape):
-        self.running_total = np.zeros(shape, dtype=self.array.dtype)
+    def bootstrap(self, processed_chunk_shape):
+        self.running_total = np.zeros(processed_chunk_shape,
+                                      dtype=self.array.dtype)
 
     def finalise(self):
         array = self.running_total / self.array.shape[self.axis]
@@ -1527,7 +1555,8 @@ class _MeanMaskedStreamsHandler(_AggregationStreamsHandler):
         self._mdtol = mdtol
         super(_MeanMaskedStreamsHandler, self).__init__(array, axis)
 
-    def bootstrap(self, shape):
+    def bootstrap(self, processed_chunk_shape):
+        shape = processed_chunk_shape
         self.running_count = np.zeros(shape, dtype=self.array.dtype)
         self.running_masked_count = np.zeros(shape, dtype=self.array.dtype)
         self.running_total = np.zeros(shape, dtype=self.array.dtype)
@@ -1568,10 +1597,10 @@ class _StdStreamsHandler(_AggregationStreamsHandler):
         self.ddof = ddof
         super(_StdStreamsHandler, self).__init__(array, axis)
 
-    def bootstrap(self, shape):
+    def bootstrap(self, processed_chunk_shape):
         self.k = 1
         dtype = (np.zeros(1, dtype=self.array.dtype) / 1.).dtype
-        self.q = np.zeros(shape, dtype=dtype)
+        self.q = np.zeros(processed_chunk_shape, dtype=dtype)
 
     def finalise(self):
         self.q /= (self.k - self.ddof)
@@ -1614,12 +1643,16 @@ class _StdMaskedStreamsHandler(_AggregationStreamsHandler):
     def __init__(self, array, axis, ddof):
         self.ddof = ddof
         super(_StdMaskedStreamsHandler, self).__init__(array, axis)
+        self.target_shape = list(self.array.shape)
+        del self.target_shape[self.axis]
 
-    def bootstrap(self, shape):
+    def bootstrap(self, processed_chunk_shape):
         dtype = (np.zeros(1, dtype=self.array.dtype) / 1.).dtype
-        self.a = np.zeros(shape, dtype=dtype).flatten()
-        self.q = np.zeros(shape, dtype=dtype).flatten()
-        self.running_count = np.zeros(shape, dtype=dtype).flatten()
+        self.a = np.zeros(processed_chunk_shape, dtype=dtype).flatten()
+        self.q = np.zeros(processed_chunk_shape, dtype=dtype).flatten()
+        self.running_count = np.zeros(processed_chunk_shape,
+                                      dtype=dtype).flatten()
+        self.current_shape = processed_chunk_shape
 
     def finalise(self):
         mask = self.running_count == 0
