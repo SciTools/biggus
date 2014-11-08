@@ -52,6 +52,7 @@ For example::
 """
 from __future__ import division
 
+from six.moves import builtins
 from abc import ABCMeta, abstractproperty, abstractmethod
 import collections
 import itertools
@@ -1252,15 +1253,17 @@ def _all_slices_inner(item_size, shape, always_slices=False):
             step = MAX_CHUNK_SIZE // nbytes
             slices = []
             for start in range(0, size, step):
-                slices.append(slice(start, start + step))
+                slices.append(slice(start, builtins.min(start + step, size)))
         nbytes *= size
         all_slices.insert(0, slices)
     return all_slices
 
 
-def save(sources, targets):
+def save(sources, targets, masked=False):
     """
     Save the numeric results of each source into its corresponding target.
+
+    Uses a masked array if masked is set to True.
 
     """
     # TODO: Remove restriction
@@ -1279,7 +1282,10 @@ def save(sources, targets):
     all_slices = _all_slices(array)
     for index in np.ndindex(*[len(slices) for slices in all_slices]):
         keys = tuple(slices[i] for slices, i in zip(all_slices, index))
-        target[keys] = array[keys].ndarray()
+        if masked:
+            target[keys] = array[keys].masked_array()
+        else:
+            target[keys] = array[keys].ndarray()
 
 
 class _StreamsHandler(object):
