@@ -52,7 +52,6 @@ For example::
 """
 from __future__ import division
 
-from six.moves import builtins
 from abc import ABCMeta, abstractproperty, abstractmethod
 import collections
 import itertools
@@ -1253,7 +1252,7 @@ def _all_slices_inner(item_size, shape, always_slices=False):
             step = MAX_CHUNK_SIZE // nbytes
             slices = []
             for start in range(0, size, step):
-                slices.append(slice(start, builtins.min(start + step, size)))
+                slices.append(slice(start, np.min([start + step, size])))
         nbytes *= size
         all_slices.insert(0, slices)
     return all_slices
@@ -1263,7 +1262,14 @@ def save(sources, targets, masked=False):
     """
     Save the numeric results of each source into its corresponding target.
 
-    Uses a masked array if masked is set to True.
+    Parameters
+    ----------
+    sources: list
+        The list of source arrays for saving from; limited to length 1.
+    targets: list
+        The list of target arrays for saving to; limited to length 1.
+    masked: boolean
+        Uses a masked array from sources if True.
 
     """
     # TODO: Remove restriction
