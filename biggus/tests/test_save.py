@@ -22,6 +22,7 @@ Unit tests for `biggus.save()`.
 import unittest
 
 import numpy as np
+import numpy.ma
 
 import biggus
 
@@ -69,6 +70,31 @@ class TestWritePattern(unittest.TestCase):
         target = _WriteCounter(array.shape)
         biggus.save([array], [target])
         self.assertTrue(target.all_written())
+
+
+class TestMaskedSave(unittest.TestCase):
+    # check that the masked keyword arguement puts a masked array in the target
+    def _small_array(self):
+        shape = (768, 1024)
+        data = np.arange(np.prod(shape), dtype=np.float32).reshape(shape)
+        data = np.ma.array(data, mask=False)
+        return data
+
+    def _masked_array_with_mask(self):
+        array = self._small_array()
+        array.mask[0, 7] = True
+        array = biggus.NumpyArrayAdapter(array)
+        return array
+
+    def _masked_array(self):
+        array = self._small_array()
+        return array
+
+    def test_mask(self):
+        source = self._masked_array_with_mask()
+        target = self._masked_array()
+        biggus.save([source], [target], masked=True)
+        self.assertTrue(target.mask[0, 7])
 
 
 class TestNumbers(unittest.TestCase):
