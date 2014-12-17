@@ -1,7 +1,32 @@
 language: python
 python:
-  - "2.7"
-  - "3.3"
-  - "3.4"
-install: "pip install -r requirements.txt --use-mirrors"
-script: "python setup.py test"
+ - '2.7'
+ - '3.3'
+ - '3.4'
+
+env:
+  global:
+    - CONDA_BLD_PATH=~/builds/
+  matrix:
+    - CONDA_BUILD=true  CONDA_NPY=18
+    - CONDA_BUILD=true  CONDA_NPY=19
+    - PIP_BUILD=true
+
+  global:
+    # BINSTAR_TOKEN, created by first "binstar auth --create --name BiggusTravisCI -o SciTools" then "travis encrypt BINSTAR_TOKEN=<TOKEN>".
+    secure: bI6LYzyjZubMMx7cALrhcmfY0Af6KCo7BUBl23XLWY64+zFDwC7Od2mWnVWqKKuGMaexgSyOwoyfBTMGfvNDVF1fNiQwjD8XNquPMZdyFcLISEBdotkCl4lmrOj50VBIw4Sq5NcbbVdVsk8qMgUX9keZhESLlf2qza26NYtN+yQ=
+
+install:
+  - if [[ "${CONDA_BUILD}" ]]; then source conda.recipe/setup_conda_on_travis.sh; fi
+  - if [[ "${PIP_BUILD}" ]]; then pip install -r requirements.txt --use-mirrors; fi
+
+script:
+  # The environment variables to conda build are not preserved, so write the important ones to a file which can be read by the
+  # build script
+  - if [[ "${CONDA_BUILD}" ]]; then echo ${TRAVIS_BRANCH} > conda.recipe/travis_branch.txt; echo ${TRAVIS_TAG} > conda.recipe/travis_tag.txt; fi
+  - if [[ "${CONDA_BUILD}" ]]; then conda build ./conda.recipe; fi
+  - if [[ "${PIP_BUILD}" ]]; then python setup.py test; fi
+
+after_success:
+  # We only upload if there is a Binstar token defined. That only happens if travis-ci is running on SciTools/biggus - and not on PRs to that repo.
+  - if [[ "${CONDA_BUILD}" ]] && [[ "${BINSTAR_TOKEN}" ]]; then binstar -t ${BINSTAR_TOKEN} upload -u scitools -c dev ~/builds/*/biggus*.tar.bz2; fi

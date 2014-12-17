@@ -1,0 +1,18 @@
+package:
+    name: biggus
+
+source:
+    path: ../
+
+requirements:
+    build:
+        - python
+        - setuptools
+    run:
+        - python
+        - numpy
+
+about:
+    home: https://pypi.python.org/pypi/Biggus
+    license: LGPL
+    summary: Virtual large arrays and lazy evaluation.
