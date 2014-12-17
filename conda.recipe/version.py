@@ -15,7 +15,7 @@ def version_str(directory, branch, SHA):
         n_commits = len(commits.split(b'\n'))
     else:
         n_commits = 0
-    return '{branch}.{n_commits}.g{SHA}'.format(branch=branch,
+    return 'test.{branch}.{n_commits}.g{SHA}'.format(branch=branch,
                                                n_commits=n_commits,
                                                SHA=SHA)
 

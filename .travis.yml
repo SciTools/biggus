@@ -5,8 +5,6 @@ python:
  - '3.4'
 
 env:
-  global:
-    - CONDA_BLD_PATH=~/builds/
   matrix:
     - CONDA_BUILD=true  CONDA_NPY=18
     - CONDA_BUILD=true  CONDA_NPY=19
@@ -29,4 +27,4 @@ script:
 
 after_success:
   # We only upload if there is a Binstar token defined. That only happens if travis-ci is running on SciTools/biggus - and not on PRs to that repo.
-  - if [[ "${CONDA_BUILD}" ]] && [[ "${BINSTAR_TOKEN}" ]]; then binstar -t ${BINSTAR_TOKEN} upload -u scitools -c dev ~/builds/*/biggus*.tar.bz2; fi
+  - if [[ "${CONDA_BUILD}" ]] && [[ "${BINSTAR_TOKEN}" ]]; then binstar -t ${BINSTAR_TOKEN} upload -u scitools -c dev_for_rh ~/miniconda/conda-bld/*/biggus*.tar.bz2; fi
