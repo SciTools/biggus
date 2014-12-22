@@ -84,6 +84,36 @@ class TestNdarray(unittest.TestCase):
         self.assert_counts(a_counter.counts, [1])
         self.assert_counts(b_counter.counts, [1])
 
+    def test_dual_mean_of_difference(self):
+        # MEAN(B - A) and MEAN(C - A)
+        shape = (500, 30, 40)
+        size = np.prod(shape)
+        raw_data = np.linspace(0, 1, num=size).reshape(shape)
+        a_counter = AccessCounter(raw_data)
+        a_array = biggus.NumpyArrayAdapter(a_counter)
+        b_counter = AccessCounter(raw_data * 3)
+        b_array = biggus.NumpyArrayAdapter(b_counter)
+        c_counter = AccessCounter(raw_data * 5)
+        c_array = biggus.NumpyArrayAdapter(c_counter)
+
+        b_sub_a_array = biggus.sub(b_array, a_array)
+        mean_b_sub_a_array = biggus.mean(b_sub_a_array, axis=0)
+        c_sub_a_array = biggus.sub(c_array, a_array)
+        mean_c_sub_a_array = biggus.mean(c_sub_a_array, axis=0)
+
+        mean_b_sub_a, mean_c_sub_a = biggus.ndarrays([mean_b_sub_a_array,
+                                                      mean_c_sub_a_array])
+
+        # Are the resulting numbers equivalent?
+        np.testing.assert_array_almost_equal(mean_b_sub_a,
+                                             np.mean(raw_data * 2, axis=0))
+        np.testing.assert_array_almost_equal(mean_c_sub_a,
+                                             np.mean(raw_data * 4, axis=0))
+        # Was the source data read just once?
+        self.assert_counts(a_counter.counts, [1])
+        self.assert_counts(b_counter.counts, [1])
+        self.assert_counts(c_counter.counts, [1])
+
     def test_mean_of_a_and_mean_of_difference(self):
         # MEAN(A) and MEAN(A - B)
         shape = (500, 30, 40)
