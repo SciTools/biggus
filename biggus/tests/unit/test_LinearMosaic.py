@@ -38,7 +38,7 @@ class Test___init___invalid(unittest.TestCase):
 
 def fake_array(fill_value, dtype=np.dtype('f4')):
     return mock.Mock(shape=(3, 4), dtype=dtype, fill_value=fill_value,
-                     spec=Array)
+                     ndim=2, spec=Array)
 
 
 class Test___init___fill_values(unittest.TestCase):
