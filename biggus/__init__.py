@@ -1224,7 +1224,13 @@ class LinearMosaic(Array):
                 if isinstance(axis_key, slice) and \
                         axis_key.step is not None and axis_key.step < 0:
                     tiles.reverse()
-                result = LinearMosaic(tiles, axis)
+                # Adjust the axis of the new mosaic to account for any
+                # scalar keys prior to our current mosaic axis.
+                new_axis = axis
+                for key in keys[:axis]:
+                    if _is_scalar(key):
+                        new_axis -= 1
+                result = LinearMosaic(tiles, new_axis)
             else:
                 raise TypeError('invalid key {!r}'.format(axis_key))
 

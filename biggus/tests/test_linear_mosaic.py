@@ -176,6 +176,22 @@ class TestLinearMosaic(unittest.TestCase):
         with self.assertRaises(TypeError):
             result = mosaic['foo'].ndarray()
 
+    def test_getitem_adjust_axis(self):
+        tile_1 = self._tile((3, 4, 5))
+        tile_2 = self._tile((3, 4, 2))
+        mosaic = biggus.LinearMosaic([tile_1, tile_2], 2)
+        result = mosaic[1, :, :]
+        self.assertEqual(result.shape, (4, 7))
+        result = mosaic[:, 1, :]
+        self.assertEqual(result.shape, (3, 7))
+
+    def test_getitem_adjust_axis_2(self):
+        tile_1 = self._tile((3, 4, 5))
+        tile_2 = self._tile((3, 4, 2))
+        mosaic = biggus.LinearMosaic([tile_1, tile_2], 2)
+        result = mosaic[1, 1, :]
+        self.assertEqual(result.shape, (7,))
+
     def test_ndarray(self):
         tile3x4 = self._tile((3, 4))
         mosaic = biggus.LinearMosaic(tile3x4, 0)
