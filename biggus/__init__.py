@@ -936,6 +936,131 @@ def _groups_of(length, total_length):
     return _pairwise(indices)
 
 
+class TransposedArray(Array):
+    def __init__(self, array, axes=None):
+        """
+        Permute the dimensions of an array.
+
+        Parameters
+        ----------
+        array - array like
+            The array to transpose
+        axes - list of ints, optional
+            By default, reverse the dimensions, otherwise permute the axes
+            according to the values given.
+
+        """
+        self.pre_transposed = array
+        if axes is None:
+            axes = np.arange(array.ndim)[::-1]
+        elif len(axes) != array.ndim:
+            raise ValueError('Incorrect number of dimensions.')
+        self.axes = axes
+        self._forward_axes_map = {src: dest for dest, src in enumerate(axes)}
+        self._inverse_axes_map = {dest: src for dest, src in enumerate(axes)}
+
+    def __repr__(self):
+        return 'TransposedArray({!r}, {!r})'.format(self.pre_transposed,
+                                                    self.axes)
+
+    def _apply_axes_mapping(self, target, inverse=False):
+        """
+        Apply the transposition to the target iterable.
+
+        Parameters
+        ----------
+        target - iterable
+            The iterable to transpose. This would be suitable for things
+            such as a shape as well as a list of ``__getitem__`` keys.
+        inverse - bool
+            Whether to map old dimension to new dimension (forward), or
+            new dimension to old dimension (inverse). Default is False
+            (forward).
+
+        Returns
+        -------
+        A tuple derived from target which has been ordered based on the new
+        axes.
+
+        """
+        if len(target) != self.ndim:
+            raise ValueError('The target iterable is of length {}, but '
+                             'should be of length {}.'.format(len(target),
+                                                              self.ndim))
+        if inverse:
+            axis_map = self._inverse_axes_map
+        else:
+            axis_map = self._forward_axes_map
+
+        result = [None] * self.ndim
+        for axis, item in enumerate(target):
+            result[axis_map[axis]] = item
+        return tuple(result)
+
+    @property
+    def ndim(self):
+        return self.pre_transposed.ndim
+
+    @property
+    def dtype(self):
+        return self.pre_transposed.dtype
+
+    @property
+    def shape(self):
+        return self._apply_axes_mapping(self.pre_transposed.shape)
+
+    def __getitem__(self, keys):
+        keys = _full_keys(keys, self.ndim)
+        new_transpose_order = self.axes[:]
+
+        # Split the keys into np.newaxis and normal keys.
+        new_axes = [axis for axis, key in enumerate(keys) if key is None]
+        keys = [key for key in keys if key is not None]
+
+        # Map the keys in transposed space back to pre-transposed space.
+        remapped_keys = list(self._apply_axes_mapping(keys, inverse=True))
+
+        # Put the new_axes (np.newaxis) onto the end of the remapped keys.
+        for n_new_axes, new_axis in enumerate(new_axes):
+            remapped_keys.append(np.newaxis)
+            new_transpose_order.insert(new_axis, self.ndim + n_new_axes)
+
+        # Apply the keys to the pre-transposed array.
+        new_arr = self.pre_transposed[tuple(remapped_keys)]
+
+        # Compute the new scalar axes in terms of old (pre-transpose)
+        # dimension numbers.
+        new_scalar_axes = [dim for dim, key in enumerate(remapped_keys)
+                           if _is_scalar(key)]
+
+        # Compute the new transpose axes by successively taking the highest
+        # new scalar axes, and removing it from the axes mapping. We must
+        # remember that any axis greater than the removed dimension must
+        # also be reduced by 1.
+        while new_scalar_axes:
+            # Take the highest scalar axis.
+            scalar_axis = new_scalar_axes.pop()
+            new_transpose_order = [axis - 1 if axis >= scalar_axis else axis
+                                   for axis in new_transpose_order
+                                   if axis != scalar_axis]
+
+        return TransposedArray(new_arr, new_transpose_order)
+
+    def ndarray(self):
+        if isinstance(self.pre_transposed, Array):
+            a = self.pre_transposed.ndarray()
+        else:
+            a = self.pre_transposed
+        return a.transpose(self.axes)
+
+    def masked_array(self):
+        if isinstance(self.pre_transposed, Array):
+            a = self.pre_transposed.masked_array()
+        else:
+            a = self.pre_transposed
+        return a.transpose(self.axes)
+
+
 class ArrayStack(Array):
     """
     An Array made from a homogeneous array of other Arrays.
@@ -2141,6 +2266,56 @@ def _sliced_shape(shape, keys):
             sliced_shape.append(size)
     sliced_shape = tuple(sliced_shape)
     return sliced_shape
+
+
+def _full_keys(keys, ndim):
+    """
+    Given keys such as those passed to ``__getitem__`` for an
+    array of ndim, return a fully expanded tuple of keys.
+
+    In all instances, the result of this operation should follow:
+
+        array[keys] == array[_full_keys(keys, array.ndim)]
+
+    """
+    if not isinstance(keys, tuple):
+        keys = (keys,)
+
+    lh_keys = []
+    # Keys, with the last key first.
+    rh_keys = []
+
+    lh_new_axes = 0
+    rh_new_axes = 0
+
+    keys = list(keys)[:]
+    take_from_left = True
+    while keys:
+        if take_from_left:
+            next_key = keys.pop(0)
+            keys_list = lh_keys
+        else:
+            next_key = keys.pop(-1)
+            keys_list = rh_keys
+
+        if next_key is Ellipsis:
+            next_key = slice(None)
+            take_from_left = not take_from_left
+        elif next_key is np.newaxis:
+            if take_from_left:
+                lh_new_axes += 1
+            else:
+                rh_new_axes += 1
+        keys_list.append(next_key)
+
+    lh_len = len(lh_keys) - lh_new_axes
+    rh_len = len(rh_keys) - rh_new_axes
+
+    if rh_len + lh_len > ndim:
+        raise IndexError('Dimensions are over specified for indexing.')
+
+    middle = [slice(None)] * (ndim - rh_len - lh_len)
+    return tuple(lh_keys + middle + rh_keys[::-1])
 
 
 def ensure_array(array):
