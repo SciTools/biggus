@@ -49,10 +49,6 @@ class Test__apply_axes_mapping(unittest.TestCase):
 
 
 class Test_shape(unittest.TestCase):
-    def setUp(self):
-        self.zeros = ConstantArray([10, 20, 40, 50])
-        self.a = TransposedArray(self.zeros, [1, 3, 0, 2])
-
     def transposed_shape(self, shape, axes):
         return TransposedArray(ConstantArray(shape), axes).shape
 
