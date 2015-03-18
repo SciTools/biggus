@@ -955,7 +955,7 @@ class TransposedArray(Array):
             axes = np.arange(array.ndim)[::-1]
         elif len(axes) != array.ndim:
             raise ValueError('Incorrect number of dimensions.')
-        self.axes = axes
+        self.axes = list(axes)
         self._forward_axes_map = {src: dest for dest, src in enumerate(axes)}
         self._inverse_axes_map = {dest: src for dest, src in enumerate(axes)}
 
