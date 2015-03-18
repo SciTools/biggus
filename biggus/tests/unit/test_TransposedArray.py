@@ -117,12 +117,15 @@ class Test___getitem__(unittest.TestCase):
             result = self.a[:2, 0, :, 2, 1]
 
     def test_new_axis_indexing_more_than_n(self):
-        t = TransposedArray(self.orig_array, tuple(self.a.axes))
-        for array in [self.a, t]:
-            result = self.a[:2, 0, :, np.newaxis, :]
-            expected = self.arr_transposed[:2, 0, :, np.newaxis, :]
-            self.assertEqual(result.shape, (2, 5, 1, 4))
-            assert_array_equal(result.ndarray(), expected)
+        result = self.a[:2, 0, :, np.newaxis, :]
+        expected = self.arr_transposed[:2, 0, :, np.newaxis, :]
+        self.assertEqual(result.shape, (2, 5, 1, 4))
+        assert_array_equal(result.ndarray(), expected)
+
+    def test_axes_non_list(self):
+        arr = TransposedArray(self.orig_array, tuple(self.a.axes))
+        result = arr[:2, 0, :, np.newaxis, :]
+        self.assertEqual(result.shape, (2, 5, 1, 4))
 
 
 if __name__ == '__main__':
