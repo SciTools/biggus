@@ -2301,14 +2301,27 @@ def _full_keys(keys, ndim):
     if not isinstance(keys, tuple):
         keys = (keys,)
 
+    # Make keys mutable, and take a copy.
+    keys = list(keys)[:]
+
+    # Count the number of keys which actually slice a dimension.
+    n_keys_non_newaxis = len([key for key in keys if key is not np.newaxis])
+
+    # Numpy allows an extra dimension to be an Ellipsis, we remove it here
+    # if Ellipsis is in keys, if this doesn't trigger we will raise an
+    # IndexError.
+    if n_keys_non_newaxis - 1 >= ndim and Ellipsis in keys:
+        # Remove the left-most Ellipsis, as numpy does.
+        keys.remove(Ellipsis)
+        n_keys_non_newaxis -= 1
+
+    if n_keys_non_newaxis > ndim:
+        raise IndexError('Dimensions are over specified for indexing.')
+
     lh_keys = []
     # Keys, with the last key first.
     rh_keys = []
 
-    lh_new_axes = 0
-    rh_new_axes = 0
-
-    keys = list(keys)[:]
     take_from_left = True
     while keys:
         if take_from_left:
@@ -2321,20 +2334,9 @@ def _full_keys(keys, ndim):
         if next_key is Ellipsis:
             next_key = slice(None)
             take_from_left = not take_from_left
-        elif next_key is np.newaxis:
-            if take_from_left:
-                lh_new_axes += 1
-            else:
-                rh_new_axes += 1
         keys_list.append(next_key)
 
-    lh_len = len(lh_keys) - lh_new_axes
-    rh_len = len(rh_keys) - rh_new_axes
-
-    if rh_len + lh_len > ndim:
-        raise IndexError('Dimensions are over specified for indexing.')
-
-    middle = [slice(None)] * (ndim - rh_len - lh_len)
+    middle = [slice(None)] * (ndim - n_keys_non_newaxis)
     return tuple(lh_keys + middle + rh_keys[::-1])
 
 

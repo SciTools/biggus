@@ -73,6 +73,16 @@ class Test__full_keys(unittest.TestCase):
         self.assertFullSlice((np.newaxis, Ellipsis, None, np.newaxis), 2,
                              [None, slice(None), slice(None), None, None])
 
+    def test_redundant_ellipsis(self):
+        keys = (slice(None), Ellipsis, 0, Ellipsis, slice(None))
+        self.assertFullSlice(keys, 4,
+                             (slice(None), 0, slice(None), slice(None)))
+
+    def test_ellipsis_expands_to_nothing(self):
+        keys = (slice(None, None, -1), Ellipsis, slice(1, 2))
+        self.assertFullSlice(keys, 2,
+                             (slice(None, None, -1), slice(1, 2)))
+
 
 if __name__ == '__main__':
     unittest.main()
