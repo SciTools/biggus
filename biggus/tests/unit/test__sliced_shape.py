@@ -64,16 +64,28 @@ class Test__sliced_shape(unittest.TestCase):
         keys = key_gen[(1, 2), :, 0]
         self.assertSliceShape([4, 5, 6], keys, (2, 5))
 
+    def test_invalid_object_indexing(self):
+        keys = key_gen[np.nan]
+        msg = 'Invalid indexing object "nan"'
+        with self.assertRaisesRegexp(ValueError, msg):
+            _sliced_shape([4, 5, 6], keys)
+
+    def test_invalid_object_indexing_float(self):
+        # A float is a valid indexing object in numpy.
+        keys = key_gen[1.2]
+        msg = 'Invalid indexing object "1.2"'
+        with self.assertRaisesRegexp(ValueError, msg):
+            _sliced_shape([4, 5, 6], keys)
+
     def test_numpy_bool_indexing(self):
         keys = key_gen[0, :, np.arange(6) > 2]
         # The numpy bool indexing appears completely confused for >1d cases.
         self.assertSliceShape([4, 5, 6], keys, (5, 3), not_numpy=True)
 
-# Needs #122
-#     def test_all_sliced_ellipsis(self):
-#         keys = key_gen[:, :, :, ...]
-#         self.assertEqual(_sliced_shape([3, 2, 1], keys),
-#                          (3, 2, 1))
+    def test_all_sliced_ellipsis(self):
+        keys = key_gen[:, :, :, ...]
+        self.assertEqual(_sliced_shape([3, 2, 1], keys),
+                         (3, 2, 1))
 
 
 if __name__ == '__main__':

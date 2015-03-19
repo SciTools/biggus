@@ -2286,7 +2286,7 @@ def _sliced_shape(shape, keys):
             shape_dim -= 1
             sliced_shape.append(1)
         else:
-            sliced_shape.append(shape[shape_dim])
+            raise ValueError('Invalid indexing object "{}"'.format(key))
 
     sliced_shape = tuple(sliced_shape)
     return sliced_shape
