@@ -485,6 +485,21 @@ class Array(object):
 
     __hash__ = None
 
+    def __str__(self):
+        nbytes = self.nbytes
+        if nbytes < (1 << 10):
+            size = '{} B'.format(nbytes)
+        elif nbytes < (1 << 20):
+            size = '{:.02f} KiB'.format(nbytes / (1 << 10))
+        elif nbytes < (1 << 30):
+            size = '{:.02f} MiB'.format(nbytes / (1 << 20))
+        elif nbytes < (1 << 40):
+            size = '{:.02f} GiB'.format(nbytes / (1 << 30))
+        else:
+            size = '{:.02f} TiB'.format(nbytes / (1 << 40))
+        fmt = '<Array shape={} dtype={!r} size={}>'
+        return fmt.format(self.shape, self.dtype, size)
+
     def __repr__(self):
         return '<{} shape={} dtype={!r}>'.format(type(self).__name__,
                                                  self.shape, self.dtype)
@@ -493,6 +508,11 @@ class Array(object):
     def fill_value(self):
         """The value used to fill in masked values where necessary."""
         return np.ma.empty(0, dtype=self.dtype).fill_value
+
+    @property
+    def nbytes(self):
+        """The total number of bytes required to store the array data."""
+        return int(np.product(self.shape) * self.dtype.itemsize)
 
     @property
     def ndim(self):
