@@ -160,5 +160,21 @@ class Test_multidim_array_stack(unittest.TestCase):
                                             order='random')
 
 
+class Test___getitem__(unittest.TestCase):
+    # Note, these are not a complete set of unit tests.
+    # Currently they only handle the newaxis checking.
+    # There are more tests in biggus.tests.test_stack.
+    def setUp(self):
+        self.a1 = ConstantArray([4, 3])
+        self.a2 = ConstantArray([4, 3])
+        self.a = ArrayStack([self.a1, self.a2])
+
+    def test_newaxis_leading(self):
+        self.assertEqual(self.a[np.newaxis].shape, (1, 2, 4, 3))
+
+    def test_newaxis_trailing(self):
+        self.assertEqual(self.a[..., np.newaxis].shape, (2, 4, 3, 1))
+
+
 if __name__ == '__main__':
     unittest.main()

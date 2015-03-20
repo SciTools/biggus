@@ -1,4 +1,4 @@
-# (C) British Crown Copyright 2012, Met Office
+# (C) British Crown Copyright 2012 - 2015, Met Office
 #
 # This file is part of Biggus.
 #
@@ -47,6 +47,8 @@ class TestStack(unittest.TestCase):
             [(6, 70), (30, 40), [(5, 3, 2, 1)], ()],
             [(6, 70), (30, 40), [5, (3, 2), 1], ()],
             [(6, 70), (30, 40), [(slice(None, None), 6)], (6, 30, 40)],
+            [(6, 70), (30, 40), [(slice(None, None), np.newaxis, 6)],
+             (6, 1, 30, 40)],
             [(6, 70), (30, 40), [(slice(None, None), slice(1, 5))],
              (6, 4, 30, 40)],
             [(6, 70), (30, 40), [(slice(None, None),), 4], (70, 30, 40,)],
@@ -62,16 +64,18 @@ class TestStack(unittest.TestCase):
              (1, 4, 30, 40)],
             [(6, 70), (30, 40), [(slice(None, None), slice(2, 6)),
                                  (slice(5, 10),)], (1, 4, 30, 40)],
-            [(6, 70), (30, 40), [3.5], TypeError],
-            [(6, 70), (30, 40), ['foo'], TypeError],
-            [(6, 70), (30, 40), [object()], TypeError],
+            [(6, 70), (30, 40), [3.5], ValueError],
+            [(6, 70), (30, 40), ['foo'], ValueError],
+            [(6, 70), (30, 40), [object()], ValueError],
         ]
         dtype = np.dtype('f4')
         for stack_shape, item_shape, cuts, target in tests:
+
             def make_array(*n):
                 concrete = np.empty(item_shape, dtype)
                 array = biggus.NumpyArrayAdapter(concrete)
                 return array
+
             stack = np.empty(stack_shape, dtype='O')
             for index in np.ndindex(stack.shape):
                 stack[index] = make_array()
