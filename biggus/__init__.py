@@ -1,4 +1,4 @@
-# (C) British Crown Copyright 2012 - 2014, Met Office
+# (C) British Crown Copyright 2012 - 2015, Met Office
 #
 # This file is part of Biggus.
 #
@@ -593,7 +593,6 @@ class ConstantArray(Array):
         return self._shape
 
     def __getitem__(self, keys):
-        keys = self._normalise_keys(keys)
         shape = _sliced_shape(self.shape, keys)
         return ConstantArray(shape, self.value, self._dtype)
 
@@ -681,8 +680,7 @@ class _ArrayAdapter(Array):
 
     @property
     def shape(self):
-        shape = _sliced_shape(self.concrete.shape, self._keys)
-        return shape
+        return _sliced_shape(self.concrete.shape, self._keys)
 
     def _cleanup_new_key(self, key, size, axis):
         """
@@ -896,9 +894,10 @@ class OrthoArrayAdapter(_ArrayAdapter):
 
     For example::
 
-        >>> ortho_concrete.shape
+        >>> ortho = OrthoArrayAdapter(ConstantArray(shape=[100, 200, 300]))
+        >>> ortho.shape
         (100, 200, 300)
-        >> ortho_concrete[(0, 3, 4), :, (1, 9)].shape
+        >>> ortho[(0, 3, 4), :, (1, 9)].shape
         (3, 200, 2)
 
     A netCDF4.Variable instance is an example orthogonal concrete array.
@@ -2245,34 +2244,39 @@ def sub(a, b):
     return _Elementwise(a, b, np.subtract, np.ma.subtract)
 
 
-# TODO: Test
 def _sliced_shape(shape, keys):
     """
     Returns the shape that results from slicing an array of the given
     shape by the given keys.
 
-    e.g.
-        shape=(52350, 70, 90, 180)
-        keys= ( 0:10,  3,  :, 2:3)
-    gives:
-        sliced_shape=(10, 90, 1)
+    >>> _sliced_shape(shape=(52350, 70, 90, 180),
+    ...               keys=(np.newaxis, slice(None, 10), 3,
+    ...                     slice(None), slice(2, 3)))
+    (1, 10, 90, 1)
 
     """
+    keys = _full_keys(keys, len(shape))
+
     sliced_shape = []
-    # TODO: Watch out for more keys than shape entries.
-    for size, key in itertools.izip_longest(shape, keys):
+    shape_dim = -1
+    for key in keys:
+        shape_dim += 1
         if _is_scalar(key):
             continue
         elif isinstance(key, slice):
-            size = len(range(*key.indices(size)))
+            size = len(range(*key.indices(shape[shape_dim])))
             sliced_shape.append(size)
         elif isinstance(key, np.ndarray) and key.dtype == np.dtype('bool'):
             # Numpy boolean indexing.
             sliced_shape.append(__builtin__.sum(key))
         elif isinstance(key, (tuple, np.ndarray)):
             sliced_shape.append(len(key))
+        elif key is np.newaxis:
+            shape_dim -= 1
+            sliced_shape.append(1)
         else:
-            sliced_shape.append(size)
+            raise ValueError('Invalid indexing object "{}"'.format(key))
+
     sliced_shape = tuple(sliced_shape)
     return sliced_shape
 

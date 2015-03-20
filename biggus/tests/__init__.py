@@ -32,3 +32,12 @@ class AccessCounter(object):
 
     def unique_counts(self):
         return set(np.unique(self.counts))
+
+
+class _KeyGen(object):
+    """Gives you the content of keys when indexing."""
+    def __getitem__(self, keys):
+        return keys
+
+#: An object that can be indexed to return a usable key.
+key_gen = _KeyGen()
