@@ -1020,7 +1020,7 @@ class TransposedArray(Array):
 
     def __getitem__(self, keys):
         keys = _full_keys(keys, self.ndim)
-        new_transpose_order = list(self.axes)[:]
+        new_transpose_order = list(self.axes)
 
         # Split the keys into np.newaxis and normal keys.
         new_axes = [axis for axis, key in enumerate(keys) if key is None]
@@ -2291,7 +2291,7 @@ def _full_keys(keys, ndim):
         keys = (keys,)
 
     # Make keys mutable, and take a copy.
-    keys = list(keys)[:]
+    keys = list(keys)
 
     # Count the number of keys which actually slice a dimension.
     n_keys_non_newaxis = len([key for key in keys if key is not np.newaxis])
