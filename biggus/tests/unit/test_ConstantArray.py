@@ -72,7 +72,7 @@ class Test___init__(unittest.TestCase):
 
     def test_dtype_default_integer(self):
         array = ConstantArray((), 42)
-        self.assertEqual(array.dtype, np.dtype('i8'))
+        self.assertEqual(array.dtype, np.dtype(np.int_))
 
 
 class Test___getitem__(unittest.TestCase):
