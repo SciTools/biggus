@@ -159,5 +159,42 @@ class Test_transpose(unittest.TestCase):
         self.assertEqual(result.axes, (1, 2, 0))
 
 
+
+class AssertElementwiseMixin(object):
+    def assertElementwise(self, ag1, ag2):
+        self.assertIs(ag1._array1, ag2._array1)
+        self.assertIs(ag1._array2, ag2._array2)
+        self.assertIs(ag1._numpy_op, ag2._numpy_op)
+        self.assertIs(ag1._ma_op, ag2._ma_op)
+
+
+class Test___add__(unittest.TestCase, AssertElementwiseMixin):
+    def test_other_array(self):
+        a = FakeArray([2, 4])
+        b = FakeArray([2, 4])
+        r = a + b
+        self.assertIsInstance(r, biggus._Elementwise)
+        self.assertElementwise(r, biggus.add(a, b))
+
+    def test_other_no_good(self):
+        a = FakeArray([2, 2])
+        with self.assertRaisesRegexp(TypeError, 'unsupported operand type'):
+            a + None
+
+
+class Test___sub__(unittest.TestCase, AssertElementwiseMixin):
+    def test_other_array(self):
+        a = FakeArray([2, 4])
+        b = FakeArray([2, 4])
+        r = a - b
+        self.assertIsInstance(r, biggus._Elementwise)
+        self.assertElementwise(r, biggus.sub(a, b))
+
+    def test_other_no_good(self):
+        a = FakeArray([2, 2])
+        with self.assertRaisesRegexp(TypeError, 'unsupported operand type'):
+            a - None
+
+
 if __name__ == '__main__':
     unittest.main()

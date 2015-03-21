@@ -593,6 +593,18 @@ class Array(object):
         """
         return TransposedArray(self, axis)
 
+    def __add__(self, other):
+        try:
+            return add(self, other)
+        except TypeError:
+            return NotImplemented
+
+    def __sub__(self, other):
+        try:
+            return sub(self, other)
+        except TypeError:
+            return NotImplemented
+
 
 class ArrayContainer(Array):
     "A biggus.Array which passes calls through to the contained array."
