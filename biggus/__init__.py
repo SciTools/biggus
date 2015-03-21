@@ -485,6 +485,10 @@ class Array(object):
 
     __hash__ = None
 
+    def __array__(self, dtype=None):
+        result = self.ndarray()
+        return np.asarray(result, dtype=dtype)
+
     def __str__(self):
         fmt = '<Array shape={} dtype={!r} size={}>'
         return fmt.format(self.shape, self.dtype, size(self))
@@ -1240,6 +1244,8 @@ class ArrayStack(Array):
 
 class LinearMosaic(Array):
     def __init__(self, tiles, axis):
+        if not isinstance(tiles, collections.Iterable):
+            tiles = [tiles]
         tiles = np.array(tiles, dtype='O', ndmin=1)
         if tiles.ndim != 1:
             raise ValueError('the tiles array must be 1-dimensional')

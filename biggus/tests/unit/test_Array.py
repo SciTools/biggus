@@ -23,6 +23,9 @@ import numpy as np
 from biggus import Array
 
 
+RESULT_NDARRAY = np.arange(12).reshape(3, 4)
+
+
 class FakeArray(Array):
     def __init__(self, shape, dtype='f8'):
         self._shape = shape
@@ -39,11 +42,24 @@ class FakeArray(Array):
     def __getitem__(self, keys):
         pass
 
-    def ndarray(self, keys):
-        pass
+    def ndarray(self):
+        return RESULT_NDARRAY
 
     def masked_array(self, keys):
         pass
+
+
+class Test___array__(unittest.TestCase):
+    def test(self):
+        array = FakeArray((2, 3))
+        result = array.__array__()
+        self.assertIs(result, RESULT_NDARRAY)
+
+    def test_dtype(self):
+        array = FakeArray((2, 3))
+        result = array.__array__('i4')
+        np.testing.assert_array_equal(result, RESULT_NDARRAY)
+        self.assertEqual(result.dtype, np.dtype('i4'))
 
 
 class Test_nbytes(unittest.TestCase):
