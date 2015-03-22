@@ -159,7 +159,6 @@ class Test_transpose(unittest.TestCase):
         self.assertEqual(result.axes, (1, 2, 0))
 
 
-
 class AssertElementwiseMixin(object):
     def assertElementwise(self, ag1, ag2):
         self.assertIs(ag1._array1, ag2._array1)
@@ -230,11 +229,6 @@ class Test___trudiv__(unittest.TestCase, AssertElementwiseMixin):
 
 
 class Test___pow__(unittest.TestCase, AssertElementwiseMixin):
-    def test_array_truediv(self):
-        # Div and truediv implement the same interface.
-        self.assertIs(biggus.Array.__truediv__.im_func,
-                      biggus.Array.__div__.im_func)
-
     def test_other_array(self):
         a = FakeArray([2, 4])
         b = FakeArray([2, 4])

@@ -2551,6 +2551,9 @@ class _Elementwise(ComputedArray):
 
     @property
     def sources(self):
+        return (self._array1, self._array2)
+
+    def _getitem_full_keys(self, keys):
         keys1, keys2 = self.broadcast.keys_to_preserve_broadcasting(keys)
         return _Elementwise(self._array1[keys1], self._array2[keys2],
                             self._numpy_op, self._ma_op)
