@@ -605,6 +605,27 @@ class Array(object):
         except TypeError:
             return NotImplemented
 
+    def __mul__(self, other):
+        try:
+            return multiply(self, other)
+        except TypeError:
+            return NotImplemented
+
+    def __div__(self, other):
+        try:
+            return divide(self, other)
+        except TypeError:
+            return NotImplemented
+    __truediv__ = __div__
+
+    def __pow__(self, other):
+        # n.b. __builtin__.pow() allows a modulus. That interface is not
+        # supported here as it isn't clear what the benefit is at this stage.
+        try:
+            return power(self, other)
+        except TypeError:
+            return NotImplemented
+
 
 class ArrayContainer(Array):
     "A biggus.Array which passes calls through to the contained array."
@@ -2570,6 +2591,30 @@ def sub(a, b):
 
     """
     return _Elementwise(a, b, np.subtract, np.ma.subtract)
+
+
+def multiply(a, b):
+    """
+    Return the elementwise evaluation of `a * b` as another Array.
+
+    """
+    return _Elementwise(a, b, np.multiply, np.ma.multiply)
+
+
+def divide(a, b):
+    """
+    Return the elementwise evaluation of `a / b` as another Array.
+
+    """
+    return _Elementwise(a, b, np.divide, np.ma.divide)
+
+
+def power(a, b):
+    """
+    Return the elementwise evaluation of `a ** b` as another Array.
+
+    """
+    return _Elementwise(a, b, np.power, np.ma.power)
 
 
 def _sliced_shape(shape, keys):

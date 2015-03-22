@@ -80,6 +80,15 @@ class TestElementwise(unittest.TestCase):
     def test_sub(self):
         self._test_elementwise(biggus.sub, np.subtract)
 
+    def test_multiply(self):
+        self._test_elementwise(biggus.multiply, np.multiply)
+
+    def test_divide(self):
+        self._test_elementwise(biggus.divide, np.divide)
+
+    def test_power(self):
+        self._test_elementwise(biggus.power, np.power)
+
     def test_add_nd_array(self):
         # Check that the ElementWise functionality accepts numpy arrays,
         # and the result is as expected.

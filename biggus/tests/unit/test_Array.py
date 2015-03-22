@@ -196,5 +196,57 @@ class Test___sub__(unittest.TestCase, AssertElementwiseMixin):
             a - None
 
 
+class Test___mul__(unittest.TestCase, AssertElementwiseMixin):
+    def test_other_array(self):
+        a = FakeArray([2, 4])
+        b = FakeArray([2, 4])
+        r = a * b
+        self.assertIsInstance(r, biggus._Elementwise)
+        self.assertElementwise(r, biggus.multiply(a, b))
+
+    def test_other_no_good(self):
+        a = FakeArray([2, 2])
+        with self.assertRaisesRegexp(TypeError, 'unsupported operand type'):
+            a * None
+
+
+class Test___trudiv__(unittest.TestCase, AssertElementwiseMixin):
+    def test_array_truediv(self):
+        # Div and truediv implement the same interface.
+        self.assertIs(biggus.Array.__truediv__.im_func,
+                      biggus.Array.__div__.im_func)
+
+    def test_other_array(self):
+        a = FakeArray([2, 4])
+        b = FakeArray([2, 4])
+        r = a / b
+        self.assertIsInstance(r, biggus._Elementwise)
+        self.assertElementwise(r, biggus.divide(a, b))
+
+    def test_other_no_good(self):
+        a = FakeArray([2, 2])
+        with self.assertRaisesRegexp(TypeError, 'unsupported operand type'):
+            a / None
+
+
+class Test___pow__(unittest.TestCase, AssertElementwiseMixin):
+    def test_array_truediv(self):
+        # Div and truediv implement the same interface.
+        self.assertIs(biggus.Array.__truediv__.im_func,
+                      biggus.Array.__div__.im_func)
+
+    def test_other_array(self):
+        a = FakeArray([2, 4])
+        b = FakeArray([2, 4])
+        r = a ** b
+        self.assertIsInstance(r, biggus._Elementwise)
+        self.assertElementwise(r, biggus.power(a, b))
+
+    def test_other_no_good(self):
+        a = FakeArray([2, 2])
+        with self.assertRaisesRegexp(TypeError, 'unsupported operand type'):
+            a ** None
+
+
 if __name__ == '__main__':
     unittest.main()
