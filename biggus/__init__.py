@@ -2509,8 +2509,10 @@ class _Elementwise(ComputedArray):
         array1 = ensure_array(array1)
         array2 = ensure_array(array2)
 
-        # TODO: Broadcasting
-        assert array1.shape == array2.shape
+        # Apply broadcasting to the arrays. TypeError may be raised if
+        # not broadcastable.
+        self.broadcast = broadcast(array1, array2)
+
         # TODO: Type-promotion
         assert array1.dtype == array2.dtype
         self._array1 = array1
@@ -2524,14 +2526,12 @@ class _Elementwise(ComputedArray):
 
     @property
     def shape(self):
-        return self._array1.shape
+        return self.broadcast.shape
 
     @property
     def sources(self):
-        return (self._array1, self._array2)
-
-    def _getitem_full_keys(self, keys):
-        return _Elementwise(self._array1[keys], self._array2[keys],
+        keys1, keys2 = self.broadcast.keys_to_preserve_broadcasting(keys)
+        return _Elementwise(self._array1[keys1], self._array2[keys2],
                             self._numpy_op, self._ma_op)
 
     def _calc(self, op):
@@ -2607,6 +2607,103 @@ def _sliced_shape(shape, keys):
 
     sliced_shape = tuple(sliced_shape)
     return sliced_shape
+
+
+class broadcast(object):
+    def __init__(self, array1, array2):
+        self._a1 = array1
+        self._a2 = array2
+        #: The broadcast shape.
+        self.shape = broadcast.compute_broadcast_shape(array1.shape,
+                                                       array2.shape)
+
+    @staticmethod
+    def compute_broadcast_shape(shape1, shape2):
+        """
+        Given two shapes, use numpy's broadcasting rules to compute the
+        broadcasted shape.
+
+        """
+        # Rule 1: If the two arrays differ in their number of dimensions, the
+        # shape of the array with fewer dimensions is padded with ones on its
+        # leading (left) side.
+        s1, s2 = list(shape1), list(shape2)
+        len_diff = len(s1) - len(s2)
+        if len_diff > 0:
+            s2[0:0] = [1] * len_diff
+        else:
+            s1[0:0] = [1] * -len_diff
+
+        # Rule 2: If the shape of the two arrays does not match in any
+        # dimension, the array with shape equal to 1 in that dimension is
+        # stretched to match the other shape.
+        shape = []
+        for size1, size2 in zip(s1, s2):
+            if size1 == size2:
+                shape.append(size1)
+            elif size1 == 1:
+                shape.append(size2)
+            elif size2 == 1:
+                shape.append(size1)
+            else:
+                # Rule 3: If in any dimension the sizes disagree and neither is
+                # equal to 1, an error is raised.
+                raise ValueError('operands could not be broadcast together '
+                                 'with shapes ({}) ({})'
+                                 ''.format(','.join(map(str, shape1)),
+                                           ','.join(map(str, shape2))))
+        return tuple(shape)
+
+    def keys_to_preserve_broadcasting(self, keys):
+        """
+        Given keys on the fully broadcasted array, compute keys which
+        can be applied to the original arrays such that broadcasting
+        would still take place.
+
+        For example, if ``c = a * b``, and ``keys`` are defined for ``c``,
+        compute c1 and c2 such that ``c[keys] == a[c1] * b[c2]``.
+
+        """
+        keys = _full_keys(keys, len(self.shape))
+        k1 = self._keys_for_broadcast_preserving(keys, self._a1.shape)
+        k2 = self._keys_for_broadcast_preserving(keys, self._a2.shape)
+        return k1, k2
+
+    def _keys_for_broadcast_preserving(self, full_keys, shape):
+        # Shortcut if there was no broadcasting here.
+        if shape == full_keys:
+            return full_keys
+
+        new_keys = []
+        # Iterate over the full keys along with the full shape and array shape
+        # in reverse order, thus only producing indices which are of maximum
+        # length == len(shape).
+        for key, full_size, size in zip(full_keys[::-1],
+                                        self.shape[::-1],
+                                        shape[::-1]):
+            # If the dimension wasn't a broadcasted one, just preserve the
+            # original key.
+            if full_size == size:
+                new_keys.append(key)
+                continue
+
+            if isinstance(key, slice):
+                start, stop, stride = key.indices(full_size)
+                if tuple(range(start, stop, stride)):
+                    new_keys.append(slice(0, 1))
+                else:
+                    new_keys.append(key)
+            elif _is_scalar(key):
+                if -full_size <= key < full_size:
+                    new_keys.append(0)
+                else:
+                    # We will get an error (it is out of range), but at least
+                    # preserving the original value will make it a reasonably
+                    # readable exception.
+                    new_keys.append(key)
+            else:
+                raise IndexError('Unexpected type: {}'.format(key))
+        return tuple(new_keys[::-1])
 
 
 def _full_keys(keys, ndim):

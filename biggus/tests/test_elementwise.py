@@ -25,22 +25,24 @@ from biggus.tests import AccessCounter
 class TestElementwise(unittest.TestCase):
     def _test_elementwise(self, biggus_op, numpy_op):
         # Sequence of tests, defined as:
-        #   1. Original array shape.
-        #   2. Sequence of indexing operations to apply.
+        #   1. Original array shape1.
+        #   2. Original array shape2
+        #   3. Sequence of indexing operations to apply.
         tests = [
-            [(10, ), []],
-            [(30, 40), []],
-            [(30, 40), [5]],
-            [(500, 30, 40), [slice(3, 6)]],
-            [(500, 30, 40), [(slice(None), slice(3, 6))]],
+            [(10, ), (10, ), []],
+            [(30, 40), (30, 40), []],
+            [(30, 40), (30, 40), (5,)],
+            [(10, 30, 1), (1, 40), []],
+            [(2, 3, 1), (1, 4), [slice(1, 2)]],
+            [(500, 30, 40), (500, 30, 40), [slice(3, 6)]],
+            [(500, 30, 40), (500, 30, 40), [(slice(None), slice(3, 6))]],
         ]
         axis = 0
         ddof = 0
-        for shape, cuts in tests:
+        for shape1, shape2, cuts in tests:
             # Define some test data
-            size = np.prod(shape)
-            raw_data1 = np.linspace(0.0, 1.0, num=size).reshape(shape)
-            raw_data2 = np.linspace(0.2, 1.2, num=size).reshape(shape)
+            raw_data1 = np.linspace(0.0, 1.0, np.prod(shape1)).reshape(shape1)
+            raw_data2 = np.linspace(0.2, 1.2, np.prod(shape2)).reshape(shape2)
 
             # Check the elementwise operation doesn't actually read any
             # data.
