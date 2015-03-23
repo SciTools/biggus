@@ -139,6 +139,27 @@ class TestNdarray(unittest.TestCase):
         self.assert_counts(a_counter.counts, [1])
         self.assert_counts(b_counter.counts, [1])
 
+    def test_means_across_different_axes(self):
+        # MEAN(A, axis=0) and MEAN(A, axis=1)
+        shape = (500, 30, 40)
+        size = np.prod(shape)
+        raw_data = np.linspace(0, 1, num=size).reshape(shape)
+        a_counter = AccessCounter(raw_data * 3)
+        a_array = biggus.NumpyArrayAdapter(a_counter)
+
+        mean_0_array = biggus.mean(a_array, axis=0)
+        mean_1_array = biggus.mean(a_array, axis=1)
+        mean_0, mean_1 = biggus.ndarrays([mean_0_array, mean_1_array])
+
+        # Are the resulting numbers equivalent?
+        np.testing.assert_array_almost_equal(mean_0,
+                                             np.mean(raw_data * 3, axis=0))
+        np.testing.assert_array_almost_equal(mean_1,
+                                             np.mean(raw_data * 3, axis=1))
+
+        # Was the source data read the minimal number of times?
+        self.assert_counts(a_counter.counts, [1])
+
 
 if __name__ == '__main__':
     unittest.main()
