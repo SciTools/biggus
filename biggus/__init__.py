@@ -636,10 +636,6 @@ class ArrayContainer(Array):
         return 'ArrayContainer({!r})'.format(self.array)
 
     @property
-    def ndim(self):
-        return self.array.ndim
-
-    @property
     def dtype(self):
         return self.array.dtype
 
@@ -801,7 +797,7 @@ class NewAxesArray(ArrayContainer):
 
 
 class BroadcastArray(ArrayContainer):
-    def __init__(self, array, broadcast):
+    def __init__(self, array, broadcast, leading_shape=()):
         """
         Parameters
         ----------
@@ -810,13 +806,18 @@ class BroadcastArray(ArrayContainer):
             already being broadcast, may be (further) broadcast.
         broadcast : dict
             A mapping of broadcast axis to broadcast length.
+        leading_shape : iterable
+            A shape to put on the leading dimension of the array.
 
-        >>> BroadcastArray(np.empty([1, 4]), broadcast={0: 10}).shape
-        (10, 4)
+        >>> array = BroadcastArray(np.empty([1, 4]),
+        ...                        broadcast={0: 10},
+        ...                        leading_shape=(5,))
+        >>> array.shape
+        (5, 10, 4)
 
         """
         # To avoid nesting broadcast arrays within broadcast arrays, we
-        # simply copy the exising broadcast, and apply this broadcast on
+        # simply copy the existing broadcast, and apply this broadcast on
         # top of it (in a new BroadcastArray instance).
         if isinstance(array, BroadcastArray):
             orig = array._broadcast_dict.copy()
@@ -830,7 +831,12 @@ class BroadcastArray(ArrayContainer):
         # Compute the broadcast shape.
         shape = BroadcastArray.shape_from_broadcast_dict(self.array.shape,
                                                          broadcast)
-        self._shape = tuple(shape)
+        for length in leading_shape:
+            if length < 1:
+                raise ValueError('Leading shape must all be >=1.')
+        self._leading_shape = tuple(leading_shape)
+        self._broadcast_shape = shape
+        self._shape = self._leading_shape + self._broadcast_shape
 
     @property
     def shape(self):
@@ -840,10 +846,23 @@ class BroadcastArray(ArrayContainer):
         array_keys = []
         new_broadcast_dict = {}
         axis_offset = 0
-        for axis, key in enumerate(keys):
-            if axis not in self._broadcast_dict:
+
+        # Take off the leading shape, and use the sliced_shape functionality
+        # to compute the new leading shape size.
+        leading_shape = self._leading_shape
+        leading_shape_len = len(leading_shape)
+        leading_shape = _sliced_shape(leading_shape, keys[:leading_shape_len])
+
+        axis_offset -= leading_shape_len
+
+        n_axes_removed = 0
+
+        for axis, key in enumerate(keys[leading_shape_len:],
+                                   start=leading_shape_len):
+            concrete_axis = axis + axis_offset
+            if concrete_axis not in self._broadcast_dict:
                 if _is_scalar(key):
-                    axis_offset -= 1
+                    n_axes_removed += 1
                 array_keys.append(key)
             else:
                 existing_size = self._shape[axis]
@@ -854,7 +873,7 @@ class BroadcastArray(ArrayContainer):
 
                     # TODO: Compute this without creating a range object.
                     size = len(range(*key.indices(existing_size)))
-                    new_broadcast_dict[axis + axis_offset] = size
+                    new_broadcast_dict[concrete_axis - n_axes_removed] = size
                 elif _is_scalar(key):
                     if not -existing_size <= key < existing_size:
                         raise IndexError('index {} is out of bounds for axis '
@@ -862,7 +881,7 @@ class BroadcastArray(ArrayContainer):
                     else:
                         # We want to index the broadcast dimension.
                         array_keys.append(key)
-                        axis_offset -= 1
+                        n_axes_removed += 1
                 else:
                     raise NotImplementedError('Indexing with type {} not yet '
                                               'implemented.'
@@ -872,10 +891,114 @@ class BroadcastArray(ArrayContainer):
             sub_array = self.array
         else:
             sub_array = self.array[tuple(array_keys)]
-        return BroadcastArray(sub_array, new_broadcast_dict)
+        return BroadcastArray(sub_array, new_broadcast_dict, leading_shape)
+
+    @classmethod
+    def broadcast_arrays(cls, array1, array2):
+        """
+        Given two arrays, if broadcasting needs to take place on either arrays
+        to make their shapes comparable, create BroadcastArrays for each.
+
+        """
+        shape, bcast_kwargs1, bcast_kwargs2 = (
+            BroadcastArray.compute_broadcast_kwargs(array1.shape,
+                                                    array2.shape))
+        if bcast_kwargs1['broadcast'] or bcast_kwargs1['leading_shape']:
+            array1 = BroadcastArray(array1, **bcast_kwargs1)
+
+        if bcast_kwargs2['broadcast'] or bcast_kwargs2['leading_shape']:
+            array2 = BroadcastArray(array2, **bcast_kwargs2)
+
+        return array1, array2
+
+    @staticmethod
+    def compute_broadcast_shape(shape1, shape2):
+        """
+        Given two shapes, use numpy's broadcasting rules to compute the
+        broadcasted shape.
+
+        """
+        # Rule 1: If the two arrays differ in their number of dimensions, the
+        # shape of the array with fewer dimensions is padded with ones on its
+        # leading (left) side.
+        s1, s2 = list(shape1), list(shape2)
+        len_diff = len(s1) - len(s2)
+        if len_diff > 0:
+            s2[0:0] = [1] * len_diff
+        else:
+            s1[0:0] = [1] * -len_diff
+
+        # Rule 2: If the shape of the two arrays does not match in any
+        # dimension, the array with shape equal to 1 in that dimension is
+        # stretched to match the other shape.
+        shape = []
+        for size1, size2 in zip(s1, s2):
+            if size1 == size2:
+                shape.append(size1)
+            elif size1 == 1:
+                shape.append(size2)
+            elif size2 == 1:
+                shape.append(size1)
+            else:
+                # Rule 3: If in any dimension the sizes disagree and neither is
+                # equal to 1, an error is raised.
+                raise ValueError('operands could not be broadcast together '
+                                 'with shapes ({}) ({})'
+                                 ''.format(','.join(map(str, shape1)),
+                                           ','.join(map(str, shape2))))
+        return tuple(shape)
+
+    @classmethod
+    def compute_broadcast_kwargs(cls, shape1, shape2):
+        """
+        Given two shapes, compute the broadcast shape, along with the keywords
+        needed to produce BroadcastArrays with arrays of given shape.
+
+        Parameters
+        ----------
+        shape1 : iterable
+        shape2 : iterable
+            The two shapes to broadcast against one another.
+
+        Returns
+        -------
+        full_shape : iterable
+            The full broadcast shape.
+        broadcast_kwargs1 : dict
+        broadcast_kwargs2 : dict
+            Keywords which are suitably passed through to a BroadcastArray
+            to take the original array, and broadcast to the full broadcast
+            shape.
+
+        """
+        full_shape = cls.compute_broadcast_shape(shape1, shape2)
+
+        bcast_kwargs1 = {'broadcast': {}, 'leading_shape': ()}
+        bcast_kwargs2 = {'broadcast': {}, 'leading_shape': ()}
+
+        ndim_diff = len(shape1) - len(shape2)
+
+        s1_offset = s2_offset = 0
+
+        if ndim_diff > 0:
+            s2_offset = ndim_diff
+            bcast_kwargs2['leading_shape'] = full_shape[:s2_offset]
+        elif len(shape1) < len(shape2):
+            s1_offset = abs(ndim_diff)
+            bcast_kwargs1['leading_shape'] = full_shape[:s1_offset]
+
+        for ax, (full, s1) in enumerate(zip(full_shape[s1_offset:], shape1)):
+            if full != s1:
+                bcast_kwargs1['broadcast'][ax] = full
+
+        for ax, (full, s2) in enumerate(zip(full_shape[s2_offset:], shape2)):
+            if full != s2:
+                bcast_kwargs2['broadcast'][ax] = full
+        return full_shape, bcast_kwargs1, bcast_kwargs2
 
     @classmethod
     def shape_from_broadcast_dict(cls, orig_shape, broadcast_dict):
+        """Using a broadcast dictionary, compute the broadcast shape."""
         shape = list(orig_shape)
         for axis, length in broadcast_dict.items():
             if not 0 <= axis < len(shape):
@@ -891,29 +1014,33 @@ class BroadcastArray(ArrayContainer):
         return tuple(shape)
 
     @classmethod
-    def broadcast_numpy_array(cls, array, broadcast_dict):
+    def broadcast_numpy_array(cls, array, broadcast_dict, leading_shape=()):
         """Broadcast a numpy array according to the broadcast_dict."""
         from numpy.lib.stride_tricks import as_strided
         shape = cls.shape_from_broadcast_dict(array.shape, broadcast_dict)
-        strides = list(array.strides)
+        shape = tuple(leading_shape) + shape
+        strides = [0] * len(leading_shape) + list(array.strides)
         for broadcast_axis in broadcast_dict:
-            strides[broadcast_axis] = 0
+            strides[broadcast_axis + len(leading_shape)] = 0
         return as_strided(array, shape=tuple(shape), strides=tuple(strides))
 
     def ndarray(self):
         array = super(BroadcastArray, self).ndarray()
         return BroadcastArray.broadcast_numpy_array(array,
-                                                    self._broadcast_dict)
+                                                    self._broadcast_dict,
+                                                    self._leading_shape)
 
     def masked_array(self):
         ma = super(BroadcastArray, self).masked_array()
         mask = ma.mask
         array = BroadcastArray.broadcast_numpy_array(ma.data,
-                                                     self._broadcast_dict)
+                                                     self._broadcast_dict,
+                                                     self._leading_shape)
         if isinstance(mask, np.ndarray):
             mask = BroadcastArray.broadcast_numpy_array(mask,
-                                                        self._broadcast_dict)
-        return np.ma.masked_array(array, mask)
+                                                        self._broadcast_dict,
+                                                        self._leading_shape)
+        return np.ma.masked_array(array, mask=mask)
 
 
 class ConstantArray(Array):
@@ -1373,6 +1500,10 @@ class TransposedArray(ArrayContainer):
     @property
     def shape(self):
         return self._apply_axes_mapping(self.array.shape)
+
+    @property
+    def ndim(self):
+        return self.array.ndim
 
     def _getitem_full_keys(self, keys):
         new_transpose_order = list(self.axes)
@@ -2530,9 +2661,9 @@ class _Elementwise(ComputedArray):
         array1 = ensure_array(array1)
         array2 = ensure_array(array2)
 
-        # Apply broadcasting to the arrays. TypeError may be raised if
-        # not broadcastable.
-        self.broadcast = broadcast(array1, array2)
+        # Broadcast both arrays to the full broadcast shape.
+        # TypeError will be raised if not broadcastable.
+        array1, array2 = BroadcastArray.broadcast_arrays(array1, array2)
 
         # TODO: Type-promotion
         assert array1.dtype == array2.dtype
@@ -2547,15 +2678,14 @@ class _Elementwise(ComputedArray):
 
     @property
     def shape(self):
-        return self.broadcast.shape
+        return self._array1.shape
 
     @property
     def sources(self):
         return (self._array1, self._array2)
 
     def _getitem_full_keys(self, keys):
-        keys1, keys2 = self.broadcast.keys_to_preserve_broadcasting(keys)
-        return _Elementwise(self._array1[keys1], self._array2[keys2],
+        return _Elementwise(self._array1[keys], self._array2[keys],
                             self._numpy_op, self._ma_op)
 
     def _calc(self, op):
