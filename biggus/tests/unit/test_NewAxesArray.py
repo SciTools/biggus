@@ -171,9 +171,7 @@ class Test___getitem__(unittest.TestCase):
         self.assertEqual(self.array_3d[0:1, ..., 0:1].shape, (1, 3, 1))
 
     def test_new_axis_invalid_slice(self):
-        # self.assertEqual(self.array_3d[1:2, ..., 3:1].shape, (0, 3, 0))
-        with self.assertRaises(NotImplementedError):
-            self.array_3d[1:2, ..., 3:1]
+        self.assertEqual(self.array_3d[1:2, ..., 3:1].shape, (0, 3, 0))
 
     def test_new_axis_valid_index(self):
         self.assertEqual(self.array_3d[0, ..., 0].shape, (3, ))
@@ -186,9 +184,12 @@ class Test___getitem__(unittest.TestCase):
             self.array_3d[-2]
 
     def test_new_axis_tuple_indexing(self):
-        msg = "NewAxesArray indexing not yet supported for tuple keys."
+        self.assertEqual(self.array_3d[(0, 0, 0), ...].shape, (3, 3, 1))
+
+    def test_new_axis_numpy_array_indexing(self):
+        msg = "NewAxesArray indexing not yet supported for ndarray keys."
         with self.assertRaisesRegexp(NotImplementedError, msg):
-            self.assertEqual(self.array_3d[(0, 0, 0), ...].shape, (3, 3, ))
+            self.array_3d[np.array([0, 0, 0]), ...]
 
 
 class Test_ndarray(unittest.TestCase):

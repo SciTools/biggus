@@ -709,6 +709,7 @@ class NewAxesArray(ArrayContainer):
         contained_array_keys = []
         existing_array_axis = 0
         broadcast_dict = {}
+
         for key_index, key in enumerate(keys):
             if key is np.newaxis:
                 new_axes[existing_array_axis] += 1
@@ -723,15 +724,17 @@ class NewAxesArray(ArrayContainer):
                         raise IndexError('index {} is out of bounds for axis '
                                          '{} with size 1'.format(key,
                                                                  key_index))
-
                 elif isinstance(key, slice):
-                    # Figure out the indices which this slice would pick off
-                    # on a length one dimension.
-                    indices = range(*key.indices(1))
-                    if len(indices) == 0:
-                        raise NotImplementedError('NewAxesArray indexing of '
-                                                  'new axes to length 0 not '
-                                                  'yet implemented.')
+                    new_size = len(range(*key.indices(1)))
+                    if new_size != 1:
+                        broadcast_dict[key_index] = new_size
+                elif isinstance(key, tuple):
+                    for index in key:
+                        if not -1 <= index < 1:
+                            raise IndexError('index {} is out of bounds for '
+                                             'axis {} with size 1'
+                                             ''.format(key, key_index))
+                    broadcast_dict[key_index] = len(key)
                 else:
                     raise NotImplementedError('NewAxesArray indexing not yet '
                                               'supported for {} keys.'
@@ -749,7 +752,11 @@ class NewAxesArray(ArrayContainer):
         new_axes = list(new_axes)
         for axis in sorted(axes_to_combine, reverse=True):
             new_axes[axis] += new_axes.pop(axis + 1)
-        return NewAxesArray(self.array[tuple(contained_array_keys)], new_axes)
+        new_array = NewAxesArray(self.array[tuple(contained_array_keys)],
+                                 new_axes)
+        if broadcast_dict:
+            new_array = BroadcastArray(new_array, broadcast_dict)
+        return new_array
 
     def ndarray(self):
         array = super(NewAxesArray, self).ndarray()
@@ -758,6 +765,122 @@ class NewAxesArray(ArrayContainer):
     def masked_array(self):
         array = super(NewAxesArray, self).masked_array()
         return array.__getitem__(self._newaxis_keys())
+
+
+class BroadcastArray(ArrayContainer):
+    def __init__(self, array, broadcast):
+        """
+        Parameters
+        ----------
+        array : array like
+            The array to broadcast. Only length 1 dimensions, or those
+            already being broadcast, may be (further) broadcast.
+        broadcast : dict
+            A mapping of broadcast axis to broadcast length.
+
+        >>> BroadcastArray(np.empty([1, 4]), broadcast={0: 10}).shape
+        (10, 4)
+
+        """
+        # To avoid nesting broadcast arrays within broadcast arrays, we
+        # simply copy the exising broadcast, and apply this broadcast on
+        # top of it (in a new BroadcastArray instance).
+        if isinstance(array, BroadcastArray):
+            orig = array._broadcast_dict.copy()
+            array = array.array
+            orig.update(broadcast)
+            broadcast = orig
+
+        super(BroadcastArray, self).__init__(array)
+        self._broadcast_dict = broadcast
+
+        # Compute the broadcast shape.
+        shape = BroadcastArray.shape_from_broadcast_dict(self.array.shape,
+                                                         broadcast)
+        self._shape = tuple(shape)
+
+    @property
+    def shape(self):
+        return self._shape
+
+    def _getitem_full_keys(self, keys):
+        array_keys = []
+        new_broadcast_dict = {}
+        axis_offset = 0
+        for axis, key in enumerate(keys):
+            if axis not in self._broadcast_dict:
+                if _is_scalar(key):
+                    axis_offset -= 1
+                array_keys.append(key)
+            else:
+                existing_size = self._shape[axis]
+                if isinstance(key, slice):
+                    # We just want to preserve the dimension. We will deal
+                    # with the broadcasting of the length.
+                    array_keys.append(slice(None))
+
+                    # TODO: Compute this without creating a range object.
+                    size = len(range(*key.indices(existing_size)))
+                    new_broadcast_dict[axis + axis_offset] = size
+                elif _is_scalar(key):
+                    if not -existing_size <= key < existing_size:
+                        raise IndexError('index {} is out of bounds for axis '
+                                         '{} with size 1'.format(key, axis))
+                    else:
+                        # We want to index the broadcast dimension.
+                        array_keys.append(key)
+                        axis_offset -= 1
+                else:
+                    raise NotImplementedError('Indexing with type {} not yet '
+                                              'implemented.'
+                                              ''.format(type(key)))
+        # Try to avoid a copy of self.array if we can.
+        if all(key == slice(None) for key in array_keys):
+            sub_array = self.array
+        else:
+            sub_array = self.array[tuple(array_keys)]
+        return BroadcastArray(sub_array, new_broadcast_dict)
+
+    @classmethod
+    def shape_from_broadcast_dict(cls, orig_shape, broadcast_dict):
+        shape = list(orig_shape)
+        for axis, length in broadcast_dict.items():
+            if not 0 <= axis < len(shape):
+                raise ValueError('Axis {} out of range [0, {})'
+                                 ''.format(axis, len(shape)))
+            if length < 0:
+                raise ValueError('Axis length must be positive. Got {}.'
+                                 ''.format(length))
+            if shape[axis] != 1:
+                raise ValueError('Attempted to broadcast axis {} which is of '
+                                 'length {}.'.format(axis, shape[axis]))
+            shape[axis] = length
+        return tuple(shape)
+
+    @classmethod
+    def broadcast_numpy_array(cls, array, broadcast_dict):
+        """Broadcast a numpy array according to the broadcast_dict."""
+        from numpy.lib.stride_tricks import as_strided
+        shape = cls.shape_from_broadcast_dict(array.shape, broadcast_dict)
+        strides = list(array.strides)
+        for broadcast_axis in broadcast_dict:
+            strides[broadcast_axis] = 0
+        return as_strided(array, shape=tuple(shape), strides=tuple(strides))
+
+    def ndarray(self):
+        array = super(BroadcastArray, self).ndarray()
+        return BroadcastArray.broadcast_numpy_array(array,
+                                                    self._broadcast_dict)
+
+    def masked_array(self):
+        ma = super(BroadcastArray, self).masked_array()
+        mask = ma.mask
+        array = BroadcastArray.broadcast_numpy_array(ma.data,
+                                                     self._broadcast_dict)
+        if isinstance(mask, np.ndarray):
+            mask = BroadcastArray.broadcast_numpy_array(mask,
+                                                        self._broadcast_dict)
+        return np.ma.masked_array(array, mask)
 
 
 class ConstantArray(Array):
