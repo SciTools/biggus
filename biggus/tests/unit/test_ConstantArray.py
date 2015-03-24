@@ -76,12 +76,17 @@ class Test___init__(unittest.TestCase):
 
 
 class Test___getitem__(unittest.TestCase):
-    def test(self):
+    def test_indexing_slice(self):
         shape = (30, 10, 20)
         array = ConstantArray(shape)
         result = array[:5]
         data = np.zeros(shape)[:5]
         self.assertEqual(result.shape, data.shape)
+
+    def test_newaxis(self):
+        array = ConstantArray([2, 3])
+        result = array[:5, np.newaxis]
+        self.assertEqual(result.shape, (2, 1, 3))
 
 
 class Test_masked_array(unittest.TestCase):

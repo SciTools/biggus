@@ -520,9 +520,36 @@ class Array(object):
     def shape(self):
         """The shape of the virtual array as a tuple."""
 
-    @abstractmethod
     def __getitem__(self, keys):
-        """Returns a new Array by slicing this virtual array."""
+        """Returns a new Array by slicing using _getitem_full_keys."""
+        keys = _full_keys(keys, self.ndim)
+        # To prevent numpy complaining about "None in arr" we don't
+        # simply do "np.newaxis in keys".
+        new_axis_exists = any(key is np.newaxis for key in keys)
+        if new_axis_exists:
+            # Make a NewAxisArray containing this array and 0 new axes.
+            array = NewAxesArray(self, [0] * (self.ndim + 1))
+            indexed_array = array[keys]
+        else:
+            indexed_array = self._getitem_full_keys(keys)
+        return indexed_array
+
+    def _getitem_full_keys(self, keys):
+        """
+        Returns a new Array by slicing this virtual array.
+
+        Parameters
+        ----------
+        keys - iterable of keys
+            The keys to index the array with. The default ``__getitem__``
+            removes all ``np.newaxis`` objects, and will be of length
+            array.ndim.
+
+        Note: This method must be overridden if ``__getitem__`` is defined by
+        :meth:`Array.__getitem__`.
+
+        """
+        raise NotImplementedError('_getitem_full_keys should be overridden.')
 
     @abstractmethod
     def ndarray(self):
@@ -565,6 +592,172 @@ class Array(object):
 
         """
         return TransposedArray(self, axis)
+
+
+class ArrayContainer(Array):
+    "A biggus.Array which passes calls through to the contained array."
+    def __init__(self, contained_array):
+        self.array = contained_array
+
+    def __repr__(self):
+        return 'ArrayContainer({!r})'.format(self.array)
+
+    @property
+    def ndim(self):
+        return self.array.ndim
+
+    @property
+    def dtype(self):
+        return self.array.dtype
+
+    @property
+    def shape(self):
+        return self.array.shape
+
+    def _getitem_full_keys(self, keys):
+        # We override _getitem_full_keys, not __getitem__, here, allowing
+        # containers to be indexed with np.newaxis.
+        return self.array._getitem_full_keys(keys)
+
+    def ndarray(self):
+        try:
+            return self.array.ndarray()
+        except AttributeError:
+            return np.array(self.array)
+
+    def masked_array(self):
+        try:
+            return self.array.masked_array()
+        except AttributeError:
+            return np.ma.masked_array(self.array)
+
+
+class NewAxesArray(ArrayContainer):
+    def __init__(self, array, new_axes):
+        """
+        Creates an array which has new axes (i.e. length 1) at the
+        specified locations.
+
+        Parameters
+        ----------
+        array - array like
+            The array upon which to put new axes
+        new_axes - iterable of length array.ndim + 1
+            The number of new axes for each axis.
+            e.g. [2, 1, 0] for a 2d array gain two new axes on the left hand
+            side, one in the middle, and 0 on the right hand side.
+
+        """
+        super(NewAxesArray, self).__init__(array)
+
+        if array.ndim + 1 != len(new_axes):
+            raise ValueError('The new_axes must have length {} but was '
+                             'actually length {}.'.format(array.ndim + 1,
+                                                          len(new_axes)))
+        new_axes = np.array(new_axes)
+        dtype_kind = new_axes.dtype.type
+        if (not issubclass(dtype_kind, np.integer) or np.any(new_axes < 0)):
+            raise ValueError('Only positive integer types may be used for '
+                             'new_axes.')
+
+        self._new_axes = new_axes
+
+    @property
+    def ndim(self):
+        return np.sum(self._new_axes) + self.array.ndim
+
+    @property
+    def shape(self):
+        shape = list(self.array.shape)
+        # Starting from the higher dimensions, insert 1s at the locations
+        # of new axes.
+        for axes, n_new_axes in reversed(list(enumerate(self._new_axes))):
+            for _ in range(n_new_axes):
+                shape.insert(axes, 1)
+        return tuple(shape)
+
+    def _newaxis_keys(self):
+        # Compute the keys needed to produce an array of appropriate newaxis.
+        keys = [slice(None)] * self.array.ndim
+        # Starting from the higher dimensions, insert np.newaxis at the
+        # locations of new axes.
+        for axes, n_new_axes in reversed(list(enumerate(self._new_axes))):
+            for _ in range(n_new_axes):
+                keys.insert(axes, np.newaxis)
+        return tuple(keys)
+
+    def _is_newaxis(self):
+        is_newaxis = [False] * self.array.ndim
+        for axes, n_new_axes in reversed(list(enumerate(self._new_axes))):
+            for _ in range(n_new_axes):
+                is_newaxis.insert(axes, True)
+        return tuple(is_newaxis)
+
+    def __getitem__(self, keys):
+        # We don't want to implement _getitem_full_keys here, as we
+        # don't want a potentially deep nesting of NewAxesArrays. Instead
+        # we work out where newaxis objects are in the existing array, and
+        # add any new ones that are requested.
+
+        keys = _full_keys(keys, self.ndim)
+        new_axes = self._new_axes
+
+        # Strip out an deal with any keys which are for new axes.
+        new_axes = new_axes.copy()
+        axes_to_combine = []
+        is_newaxis = list(self._is_newaxis())
+        contained_array_keys = []
+        existing_array_axis = 0
+        broadcast_dict = {}
+        for key_index, key in enumerate(keys):
+            if key is np.newaxis:
+                new_axes[existing_array_axis] += 1
+                continue
+
+            if is_newaxis.pop(0):
+                # We're indexing a new_axes axes.
+                if _is_scalar(key):
+                    if -1 <= key < 1:
+                        new_axes[existing_array_axis] -= 1
+                    else:
+                        raise IndexError('index {} is out of bounds for axis '
+                                         '{} with size 1'.format(key,
+                                                                 key_index))
+
+                elif isinstance(key, slice):
+                    # Figure out the indices which this slice would pick off
+                    # on a length one dimension.
+                    indices = range(*key.indices(1))
+                    if len(indices) == 0:
+                        raise NotImplementedError('NewAxesArray indexing of '
+                                                  'new axes to length 0 not '
+                                                  'yet implemented.')
+                else:
+                    raise NotImplementedError('NewAxesArray indexing not yet '
+                                              'supported for {} keys.'
+                                              ''.format(type(key).__name__))
+            else:
+                # We're indexing a dimension of self.array.
+                if _is_scalar(key):
+                    # One of the dimensions of the existing data is to be
+                    # removed, so we can combine the new_axes to the left
+                    # and right of this axes into a single value.
+                    axes_to_combine.append(existing_array_axis)
+                contained_array_keys.append(key)
+                existing_array_axis += 1
+
+        new_axes = list(new_axes)
+        for axis in sorted(axes_to_combine, reverse=True):
+            new_axes[axis] += new_axes.pop(axis + 1)
+        return NewAxesArray(self.array[tuple(contained_array_keys)], new_axes)
+
+    def ndarray(self):
+        array = super(NewAxesArray, self).ndarray()
+        return array.__getitem__(self._newaxis_keys())
+
+    def masked_array(self):
+        array = super(NewAxesArray, self).masked_array()
+        return array.__getitem__(self._newaxis_keys())
 
 
 class ConstantArray(Array):
@@ -610,6 +803,8 @@ class ConstantArray(Array):
         return self._shape
 
     def __getitem__(self, keys):
+        # newaxis is handled within _sliced_shape, so we override __getitem__,
+        # not _getitem_full_keys.
         shape = _sliced_shape(self.shape, keys)
         return ConstantArray(shape, self.value, self._dtype)
 
@@ -775,9 +970,7 @@ class _ArrayAdapter(Array):
             raise TypeError('invalid key {!r}'.format(new_key))
         return result_key
 
-    def __getitem__(self, keys):
-        keys = self._normalise_keys(keys)
-
+    def _getitem_full_keys(self, keys):
         result_keys = []
         shape = list(self.concrete.shape)
         src_keys = list(self._keys or [])
@@ -961,7 +1154,7 @@ def _groups_of(length, total_length):
     return _pairwise(indices)
 
 
-class TransposedArray(Array):
+class TransposedArray(ArrayContainer):
     def __init__(self, array, axes=None):
         """
         Permute the dimensions of an array.
@@ -975,7 +1168,7 @@ class TransposedArray(Array):
             according to the values given.
 
         """
-        self.pre_transposed = array
+        super(TransposedArray, self).__init__(array)
         if axes is None:
             axes = np.arange(array.ndim)[::-1]
         elif len(axes) != array.ndim:
@@ -985,8 +1178,7 @@ class TransposedArray(Array):
         self._inverse_axes_map = {dest: src for dest, src in enumerate(axes)}
 
     def __repr__(self):
-        return 'TransposedArray({!r}, {!r})'.format(self.pre_transposed,
-                                                    self.axes)
+        return 'TransposedArray({!r}, {!r})'.format(self.array, self.axes)
 
     def _apply_axes_mapping(self, target, inverse=False):
         """
@@ -1023,35 +1215,17 @@ class TransposedArray(Array):
         return tuple(result)
 
     @property
-    def ndim(self):
-        return self.pre_transposed.ndim
-
-    @property
-    def dtype(self):
-        return self.pre_transposed.dtype
-
-    @property
     def shape(self):
-        return self._apply_axes_mapping(self.pre_transposed.shape)
+        return self._apply_axes_mapping(self.array.shape)
 
-    def __getitem__(self, keys):
-        keys = _full_keys(keys, self.ndim)
+    def _getitem_full_keys(self, keys):
         new_transpose_order = list(self.axes)
-
-        # Split the keys into np.newaxis and normal keys.
-        new_axes = [axis for axis, key in enumerate(keys) if key is None]
-        keys = [key for key in keys if key is not None]
 
         # Map the keys in transposed space back to pre-transposed space.
         remapped_keys = list(self._apply_axes_mapping(keys, inverse=True))
 
-        # Put the new_axes (np.newaxis) onto the end of the remapped keys.
-        for n_new_axes, new_axis in enumerate(new_axes):
-            remapped_keys.append(np.newaxis)
-            new_transpose_order.insert(new_axis, self.ndim + n_new_axes)
-
         # Apply the keys to the pre-transposed array.
-        new_arr = self.pre_transposed[tuple(remapped_keys)]
+        new_arr = self.array[tuple(remapped_keys)]
 
         # Compute the new scalar axes in terms of old (pre-transpose)
         # dimension numbers.
@@ -1072,18 +1246,12 @@ class TransposedArray(Array):
         return TransposedArray(new_arr, new_transpose_order)
 
     def ndarray(self):
-        if isinstance(self.pre_transposed, Array):
-            a = self.pre_transposed.ndarray()
-        else:
-            a = self.pre_transposed
-        return a.transpose(self.axes)
+        array = super(TransposedArray, self).ndarray()
+        return array.transpose(self.axes)
 
     def masked_array(self):
-        if isinstance(self.pre_transposed, Array):
-            a = self.pre_transposed.masked_array()
-        else:
-            a = self.pre_transposed
-        return a.transpose(self.axes)
+        array = super(TransposedArray, self).masked_array()
+        return array.transpose(self.axes)
 
 
 class ArrayStack(Array):
@@ -1141,9 +1309,7 @@ class ArrayStack(Array):
     def shape(self):
         return self._stack.shape + self._item_shape
 
-    def __getitem__(self, keys):
-        keys = self._normalise_keys(keys)
-
+    def _getitem_full_keys(self, keys):
         stack_ndim = self._stack.ndim
         stack_keys = keys[:stack_ndim]
         item_keys = keys[stack_ndim:]
@@ -1317,8 +1483,18 @@ class LinearMosaic(Array):
             self._cached_shape = tuple(shape)
         return self._cached_shape
 
-    def __getitem__(self, keys):
-        keys = self._normalise_keys(keys)
+    def _getitem_full_keys(self, full_keys):
+        # Starting backwards, include all keys once a ``key != slice(None)``
+        # has been found. This will give us only the keys that are really
+        # necessary and thus allow us a shortcut through the indexing.
+        keys = []
+        non_full_slice_found = False
+        for key in full_keys[::-1]:
+            if key != slice(None):
+                non_full_slice_found = True
+            if non_full_slice_found:
+                keys.append(key)
+        keys = tuple(keys[::-1])
 
         axis = self._axis
         if len(keys) <= axis:
@@ -1911,8 +2087,7 @@ class _Aggregation(ComputedArray):
     def sources(self):
         return (self._array,)
 
-    def __getitem__(self, keys):
-        keys = self._normalise_keys(keys)
+    def _getitem_full_keys(self, keys):
         # Insert an ':' into these keys to get keys for self._array.
         keys = list(keys)
         keys[self._axis:self._axis] = [slice(None)]
@@ -2220,8 +2395,7 @@ class _Elementwise(ComputedArray):
     def sources(self):
         return (self._array1, self._array2)
 
-    def __getitem__(self, keys):
-        keys = self._normalise_keys(keys)
+    def _getitem_full_keys(self, keys):
         return _Elementwise(self._array1[keys], self._array2[keys],
                             self._numpy_op, self._ma_op)
 

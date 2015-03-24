@@ -21,7 +21,7 @@ import unittest
 import mock
 import numpy as np
 
-from biggus import Array, LinearMosaic
+from biggus import Array, LinearMosaic, ConstantArray
 
 
 class Test___init___invalid(unittest.TestCase):
@@ -83,6 +83,22 @@ class Test___init___fill_values(unittest.TestCase):
         array2 = fake_array('bar', np.dtype('S3'))
         mosaic = LinearMosaic(np.array([array1, array2]), 0)
         self.assertEqual(mosaic.fill_value, 'N/A')
+
+
+class Test___getitem__(unittest.TestCase):
+    # Note, these are not a complete set of unit tests.
+    # Currently they only handle the newaxis checking.
+    # There are more tests in biggus.tests.test_linear_mosaic.
+    def setUp(self):
+        self.a1 = ConstantArray([2, 3])
+        self.a2 = ConstantArray([4, 3])
+        self.a = LinearMosaic([self.a1, self.a2], axis=0)
+
+    def test_newaxis_leading(self):
+        self.assertEqual(self.a[np.newaxis].shape, (1, 6, 3))
+
+    def test_newaxis_trailing(self):
+        self.assertEqual(self.a[..., np.newaxis].shape, (6, 3, 1))
 
 
 if __name__ == '__main__':
