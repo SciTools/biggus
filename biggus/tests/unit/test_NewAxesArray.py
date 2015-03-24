@@ -60,6 +60,15 @@ class Test___init__(unittest.TestCase):
         array = NewAxesArray(np.array(0), [3])
         self.assertEqual(list(array._new_axes), [3])
 
+    def test_nested_newaxes(self):
+        # Currently it is possible to nest NewAxesArrays. It would be
+        # nice if this weren't the case.
+        orig = np.empty([3])
+        array1 = NewAxesArray(orig, [1, 0])
+        array2 = NewAxesArray(array1, [0, 0, 2])
+        self.assertEqual(array2.shape, (1, 3, 1, 1))
+        self.assertIs(array2.array, array1)
+
 
 class Test_shape(unittest.TestCase):
     def test_no_new_axes(self):
@@ -121,6 +130,7 @@ class Test___getitem__(unittest.TestCase):
     def setUp(self):
         self.array = NewAxesArray(np.arange(24).reshape(4, 3, 2),
                                   [1, 2, 0, 1])
+        self.array_3d = NewAxesArray(np.arange(3), [1, 1])
 
     def test_new_axis_ellipsis_leading(self):
         result = self.array[..., np.newaxis]
@@ -156,6 +166,29 @@ class Test___getitem__(unittest.TestCase):
         result = self.array[0, 0, np.newaxis, 0, 0, np.newaxis, 0, 0, 0]
         self.assertIsInstance(result, NewAxesArray)
         self.assertEqual(list(result._new_axes), [2])
+
+    def test_new_axis_valid_slice(self):
+        self.assertEqual(self.array_3d[0:1, ..., 0:1].shape, (1, 3, 1))
+
+    def test_new_axis_invalid_slice(self):
+        # self.assertEqual(self.array_3d[1:2, ..., 3:1].shape, (0, 3, 0))
+        with self.assertRaises(NotImplementedError):
+            self.array_3d[1:2, ..., 3:1]
+
+    def test_new_axis_valid_index(self):
+        self.assertEqual(self.array_3d[0, ..., 0].shape, (3, ))
+
+    def test_new_axis_invalid_index(self):
+        with self.assertRaises(IndexError):
+            self.array_3d[1]
+
+        with self.assertRaises(IndexError):
+            self.array_3d[-2]
+
+    def test_new_axis_tuple_indexing(self):
+        msg = "NewAxesArray indexing not yet supported for tuple keys."
+        with self.assertRaisesRegexp(NotImplementedError, msg):
+            self.assertEqual(self.array_3d[(0, 0, 0), ...].shape, (3, 3, ))
 
 
 class Test_ndarray(unittest.TestCase):

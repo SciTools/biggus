@@ -632,15 +632,17 @@ class NewAxesArray(ArrayContainer):
 
         """
         super(NewAxesArray, self).__init__(array)
-        if self.array.ndim + 1 != len(new_axes):
+
+        if array.ndim + 1 != len(new_axes):
             raise ValueError('The new_axes must have length {} but was '
-                             'actually length {}.'.format(self.array.ndim + 1,
+                             'actually length {}.'.format(array.ndim + 1,
                                                           len(new_axes)))
         new_axes = np.array(new_axes)
         dtype_kind = new_axes.dtype.type
         if (not issubclass(dtype_kind, np.integer) or np.any(new_axes < 0)):
             raise ValueError('Only positive integer types may be used for '
                              'new_axes.')
+
         self._new_axes = new_axes
 
     @property
@@ -689,14 +691,34 @@ class NewAxesArray(ArrayContainer):
         is_newaxis = list(self._is_newaxis())
         contained_array_keys = []
         existing_array_axis = 0
-        for key in keys:
+        broadcast_dict = {}
+        for key_index, key in enumerate(keys):
             if key is np.newaxis:
                 new_axes[existing_array_axis] += 1
                 continue
+
             if is_newaxis.pop(0):
                 # We're indexing a new_axes axes.
                 if _is_scalar(key):
-                    new_axes[existing_array_axis] -= 1
+                    if -1 <= key < 1:
+                        new_axes[existing_array_axis] -= 1
+                    else:
+                        raise IndexError('index {} is out of bounds for axis '
+                                         '{} with size 1'.format(key,
+                                                                 key_index))
+
+                elif isinstance(key, slice):
+                    # Figure out the indices which this slice would pick off
+                    # on a length one dimension.
+                    indices = range(*key.indices(1))
+                    if len(indices) == 0:
+                        raise NotImplementedError('NewAxesArray indexing of '
+                                                  'new axes to length 0 not '
+                                                  'yet implemented.')
+                else:
+                    raise NotImplementedError('NewAxesArray indexing not yet '
+                                              'supported for {} keys.'
+                                              ''.format(type(key).__name__))
             else:
                 # We're indexing a dimension of self.array.
                 if _is_scalar(key):
