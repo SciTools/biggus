@@ -553,6 +553,19 @@ class Array(object):
                 raise TypeError('invalid index: {!r}'.format(key))
         return keys
 
+    def transpose(self, axis=None):
+        """
+        Permute the dimensions of the array.
+
+        Parameters
+        ----------
+        axes - list of ints, optional
+            By default, reverse the dimensions, otherwise permute the axes
+            according to the values given.
+
+        """
+        return TransposedArray(self, axis)
+
 
 class ConstantArray(Array):
     """
