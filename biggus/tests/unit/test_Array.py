@@ -20,6 +20,7 @@ import unittest
 
 import numpy as np
 
+import biggus
 from biggus import Array
 
 
@@ -142,6 +143,20 @@ class Test___hash__(unittest.TestCase):
         array = FakeArray((3, 4), 'f4')
         with self.assertRaises(TypeError):
             hash(array)
+
+
+class Test_transpose(unittest.TestCase):
+    def test_default(self):
+        array = FakeArray((2, 3, 4))
+        result = array.transpose()
+        self.assertIsInstance(result, biggus.TransposedArray)
+        self.assertEqual(tuple(result.axes), (2, 1, 0))
+
+    def test_explicit(self):
+        array = FakeArray((2, 3, 4))
+        result = array.transpose((1, 2, 0))
+        self.assertIsInstance(result, biggus.TransposedArray)
+        self.assertEqual(result.axes, (1, 2, 0))
 
 
 if __name__ == '__main__':
