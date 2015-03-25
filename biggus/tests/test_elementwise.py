@@ -1,4 +1,4 @@
-# (C) British Crown Copyright 2013, Met Office
+# (C) British Crown Copyright 2013 - 2015, Met Office
 #
 # This file is part of Biggus.
 #
@@ -17,6 +17,7 @@
 import unittest
 
 import numpy as np
+from numpy.testing import assert_array_equal
 
 import biggus
 from biggus.tests import AccessCounter
@@ -25,22 +26,24 @@ from biggus.tests import AccessCounter
 class TestElementwise(unittest.TestCase):
     def _test_elementwise(self, biggus_op, numpy_op):
         # Sequence of tests, defined as:
-        #   1. Original array shape.
-        #   2. Sequence of indexing operations to apply.
+        #   1. Original array shape1.
+        #   2. Original array shape2
+        #   3. Sequence of indexing operations to apply.
         tests = [
-            [(10, ), []],
-            [(30, 40), []],
-            [(30, 40), [5]],
-            [(500, 30, 40), [slice(3, 6)]],
-            [(500, 30, 40), [(slice(None), slice(3, 6))]],
+            [(10, ), (10, ), []],
+            [(30, 40), (30, 40), []],
+            [(30, 40), (30, 40), (5,)],
+            [(10, 30, 1), (1, 40), []],
+            [(2, 3, 1), (1, 4), [slice(1, 2)]],
+            [(500, 30, 40), (500, 30, 40), [slice(3, 6)]],
+            [(500, 30, 40), (500, 30, 40), [(slice(None), slice(3, 6))]],
         ]
         axis = 0
         ddof = 0
-        for shape, cuts in tests:
+        for shape1, shape2, cuts in tests:
             # Define some test data
-            size = np.prod(shape)
-            raw_data1 = np.linspace(0.0, 1.0, num=size).reshape(shape)
-            raw_data2 = np.linspace(0.2, 1.2, num=size).reshape(shape)
+            raw_data1 = np.linspace(0.0, 1.0, np.prod(shape1)).reshape(shape1)
+            raw_data2 = np.linspace(0.2, 1.2, np.prod(shape2)).reshape(shape2)
 
             # Check the elementwise operation doesn't actually read any
             # data.
@@ -78,13 +81,35 @@ class TestElementwise(unittest.TestCase):
     def test_sub(self):
         self._test_elementwise(biggus.sub, np.subtract)
 
+    def test_multiply(self):
+        self._test_elementwise(biggus.multiply, np.multiply)
+
+    def test_true_divide(self):
+        self._test_elementwise(biggus.true_divide, np.true_divide)
+
+    def test_true_divide(self):
+        self._test_elementwise(biggus.floor_divide, np.floor_divide)
+
+    def test_power(self):
+        self._test_elementwise(biggus.power, np.power)
+
+    def test_add_integer(self):
+        # Check that the ElementWise functionality accepts numpy arrays,
+        # and the result is as expected.
+        r = biggus.add(np.arange(3) * 2, 5)
+        assert_array_equal(r.ndarray(), [5, 7, 9])
+
+    def test_true_divide_float(self):
+        r = biggus.true_divide(np.arange(3.), 2.)
+        assert_array_equal(r.ndarray(), [0., 0.5, 1.])
+
     def test_add_nd_array(self):
         # Check that the ElementWise functionality accepts numpy arrays,
         # and the result is as expected.
-        r = biggus.add(np.arange(12), np.arange(12))
+        r = biggus.add(np.arange(4), np.arange(4) * 2)
         self.assertIsInstance(r._array1, biggus.NumpyArrayAdapter)
         self.assertIsInstance(r._array2, biggus.NumpyArrayAdapter)
-        self.assertEqual(r.ndarray()[-1], 22)
+        assert_array_equal(r.ndarray(), [0, 3, 6, 9])
 
     def test_add_non_supported_type(self):
         # Check that the ElementWise functionality raises a TypeError
