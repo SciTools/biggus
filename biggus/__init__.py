@@ -611,12 +611,21 @@ class Array(object):
         except TypeError:
             return NotImplemented
 
-    def __div__(self, other):
+    def __floordiv__(self, other):
         try:
-            return divide(self, other)
+            return floor_divide(self, other)
         except TypeError:
             return NotImplemented
-    __truediv__ = __div__
+
+    # In Python 2 we implement "/" as floor division. When divide is imported
+    # from __future__ it is __truediv__ which is called in both Python 2 & 3.
+    __div__ = __floordiv__
+
+    def __truediv__(self, other):
+        try:
+            return true_divide(self, other)
+        except TypeError:
+            return NotImplemented
 
     def __pow__(self, other):
         # n.b. __builtin__.pow() allows a modulus. That interface is not
@@ -2737,12 +2746,20 @@ def multiply(a, b):
     return _Elementwise(a, b, np.multiply, np.ma.multiply)
 
 
-def divide(a, b):
+def floor_divide(a, b):
     """
     Return the elementwise evaluation of `a / b` as another Array.
 
     """
-    return _Elementwise(a, b, np.divide, np.ma.divide)
+    return _Elementwise(a, b, np.floor_divide, np.ma.floor_divide)
+
+
+def true_divide(a, b):
+    """
+    Return the elementwise evaluation of ``np.true_divide`` as another Array.
+
+    """
+    return _Elementwise(a, b, np.true_divide, np.ma.true_divide)
 
 
 def power(a, b):

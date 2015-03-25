@@ -179,11 +179,11 @@ class Test_compute_broadcast_dicts(unittest.TestCase):
         self.assertEqual(r1[1], r2[2])
         self.assertEqual(r1[2], r2[1])
 
-        self.assertEqual(dict(zip(['broadcast', 'leading_shape'],
-                                  broadcast_kwargs[0])),
+        self.assertEqual(dict(list(zip(['broadcast', 'leading_shape'],
+                                       broadcast_kwargs[0]))),
                          r1[1])
-        self.assertEqual(dict(zip(['broadcast', 'leading_shape'],
-                                  broadcast_kwargs[1])),
+        self.assertEqual(dict(list(zip(['broadcast', 'leading_shape'],
+                                       broadcast_kwargs[1]))),
                          r1[2])
 
         actual = np.broadcast(np.empty(s1), np.empty(s2)).shape

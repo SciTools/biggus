@@ -15,6 +15,7 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with Biggus. If not, see <http://www.gnu.org/licenses/>.
 """Unit tests for `biggus.Array`."""
+from __future__ import division
 
 import sys
 import unittest
@@ -210,22 +211,34 @@ class Test___mul__(unittest.TestCase, AssertElementwiseMixin):
             a * None
 
 
-class Test___trudiv__(unittest.TestCase, AssertElementwiseMixin):
-    def test_array_truediv(self):
-        # Div and truediv implement the same interface.
+class Test___floordiv__(unittest.TestCase, AssertElementwiseMixin):
+    def test_div_is_floordiv(self):
+        # Div and floordiv implement the same interface.
+        # Python3 doesn't care about div, just floordiv and truediv.
         if sys.version_info[0] == 2:
-            self.assertIs(biggus.Array.__truediv__.im_func,
+            self.assertIs(biggus.Array.__floordiv__.im_func,
                           biggus.Array.__div__.im_func)
-        else:
-            self.assertIs(biggus.Array.__truediv__,
-                          biggus.Array.__div__)
 
+    def test_other_array(self):
+        a = FakeArray([2, 4])
+        b = FakeArray([2, 4])
+        r = a // b
+        self.assertIsInstance(r, biggus._Elementwise)
+        self.assertElementwise(r, biggus.floor_divide(a, b))
+
+    def test_other_no_good(self):
+        a = FakeArray([2, 2])
+        with self.assertRaisesRegexp(TypeError, 'unsupported operand type'):
+            a // None
+
+
+class Test___trudiv__(unittest.TestCase, AssertElementwiseMixin):
     def test_other_array(self):
         a = FakeArray([2, 4])
         b = FakeArray([2, 4])
         r = a / b
         self.assertIsInstance(r, biggus._Elementwise)
-        self.assertElementwise(r, biggus.divide(a, b))
+        self.assertElementwise(r, biggus.true_divide(a, b))
 
     def test_other_no_good(self):
         a = FakeArray([2, 2])

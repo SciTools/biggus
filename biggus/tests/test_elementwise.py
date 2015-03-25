@@ -84,8 +84,11 @@ class TestElementwise(unittest.TestCase):
     def test_multiply(self):
         self._test_elementwise(biggus.multiply, np.multiply)
 
-    def test_divide(self):
-        self._test_elementwise(biggus.divide, np.divide)
+    def test_true_divide(self):
+        self._test_elementwise(biggus.true_divide, np.true_divide)
+
+    def test_true_divide(self):
+        self._test_elementwise(biggus.floor_divide, np.floor_divide)
 
     def test_power(self):
         self._test_elementwise(biggus.power, np.power)
@@ -96,9 +99,9 @@ class TestElementwise(unittest.TestCase):
         r = biggus.add(np.arange(3) * 2, 5)
         assert_array_equal(r.ndarray(), [5, 7, 9])
 
-    def test_divide_float(self):
-        r = biggus.divide(np.arange(3.), 0.5)
-        assert_array_equal(r.ndarray(), [0., 2., 4.])
+    def test_true_divide_float(self):
+        r = biggus.true_divide(np.arange(3.), 2.)
+        assert_array_equal(r.ndarray(), [0., 0.5, 1.])
 
     def test_add_nd_array(self):
         # Check that the ElementWise functionality accepts numpy arrays,
