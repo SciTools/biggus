@@ -49,11 +49,13 @@ class Test___init__(unittest.TestCase):
 
     def test_nested_broadcast_avoidance(self):
         orig = np.empty([1, 3, 1, 5, 1])
-        a = BroadcastArray(orig, {0: 10, 4: 100})
-        b = BroadcastArray(a, {0: 5, 2: 15})
+        a = BroadcastArray(orig, {0: 10, 4: 100}, (3, 2, 1))
+        b = BroadcastArray(a, {0: 5, 2: 15}, (4,))
         self.assertIs(b.array, orig)
         self.assertEqual(a._broadcast_dict, {0: 10, 4: 100})
         self.assertEqual(b._broadcast_dict, {0: 5, 2: 15, 4: 100})
+        self.assertEqual(b._leading_shape, (4, 3, 2, 1))
+        self.assertEqual(b.shape, (4, 3, 2, 1, 5, 3, 15, 5, 100))
 
     def test_leading_shape(self):
         a = BroadcastArray(np.empty([1, 3]), {0: 2}, (5, 3))
@@ -135,10 +137,10 @@ class Test_masked_array(unittest.TestCase):
         assert_array_equal(result.data, expected.data)
 
 
-class Test_broadcast_numpy_array(unittest.TestCase):
+class Test__broadcast_numpy_array(unittest.TestCase):
     def test_simple_broadcast(self):
         a = np.arange(3, dtype='>i4').reshape([3, 1])
-        result = BroadcastArray.broadcast_numpy_array(a, {1: 4})
+        result = BroadcastArray._broadcast_numpy_array(a, {1: 4})
         expected = np.array([[0, 0, 0, 0],
                              [1, 1, 1, 1],
                              [2, 2, 2, 2]])
@@ -147,7 +149,7 @@ class Test_broadcast_numpy_array(unittest.TestCase):
 
     def test_broadcast_with_leading(self):
         a = np.arange(3, dtype='>i4').reshape([3, 1])
-        result = BroadcastArray.broadcast_numpy_array(a, {1: 4}, (1,))
+        result = BroadcastArray._broadcast_numpy_array(a, {1: 4}, (1,))
         expected = np.array([[[0, 0, 0, 0],
                               [1, 1, 1, 1],
                               [2, 2, 2, 2]]])
@@ -162,15 +164,15 @@ class Test_compute_broadcast_dicts(unittest.TestCase):
         # Pick an array size which isn't realistic to realise in a
         # full array.
         a = ConstantArray([int(10 ** i) for i in range(4, 12)])
-        self.assertEqual(BroadcastArray.compute_broadcast_kwargs(a.shape,
-                                                                 a.shape)[0],
+        self.assertEqual(BroadcastArray._compute_broadcast_kwargs(a.shape,
+                                                                  a.shape)[0],
                          tuple(int(10 ** i) for i in range(4, 12)),
                          )
 
     def assertBroadcast(self, s1, s2, expected_shape, broadcast_kwargs):
         # Assert that the operations are symmetric.
-        r1 = BroadcastArray.compute_broadcast_kwargs(s1, s2)
-        r2 = BroadcastArray.compute_broadcast_kwargs(s2, s1)
+        r1 = BroadcastArray._compute_broadcast_kwargs(s1, s2)
+        r2 = BroadcastArray._compute_broadcast_kwargs(s2, s1)
 
         self.assertEqual(r1[0], expected_shape)
         self.assertEqual(r1[0], r2[0])
@@ -211,17 +213,34 @@ class Test_compute_broadcast_dicts(unittest.TestCase):
         msg = ('operands could not be broadcast together with shapes '
                '\(2\,3\) \(1\,2\,4\)')
         with self.assertRaisesRegexp(ValueError, msg):
-            BroadcastArray.compute_broadcast_kwargs([2, 3], [1, 2, 4])
+            BroadcastArray._compute_broadcast_kwargs([2, 3], [1, 2, 4])
 
 
 class Test_broadcast_arrays(unittest.TestCase):
-    def test_both_broadcast(self):
-        a1, a2 = BroadcastArray.broadcast_arrays(np.arange(10),
-                                                 np.arange(3)[:, None])
+    def test_rh_broadcast(self):
+        a = np.empty([1, 2])
+        b = np.empty([2])
+        a1, b1 = BroadcastArray.broadcast_arrays(a, b)
+        self.assertIs(a1, a)
+        self.assertIsInstance(b1, BroadcastArray)
+        self.assertEqual(b1.shape, (1, 2))
+
+    def test_lh_broadcast(self):
+        a = np.empty([2])
+        b = np.empty([1, 2])
+        a1, b1 = BroadcastArray.broadcast_arrays(a, b)
+        self.assertIs(b1, b)
         self.assertIsInstance(a1, BroadcastArray)
-        self.assertIsInstance(a2, BroadcastArray)
-        self.assertEqual(a1.shape, (3, 10))
-        self.assertEqual(a2.shape, (3, 10))
+        self.assertEqual(a1.shape, (1, 2))
+
+    def test_both_broadcast(self):
+        a = np.empty([1, 2])
+        b = np.empty([3, 1])
+        a1, b1 = BroadcastArray.broadcast_arrays(a, b)
+        self.assertIsInstance(a1, BroadcastArray)
+        self.assertIsInstance(b1, BroadcastArray)
+        self.assertEqual(a1.shape, (3, 2))
+        self.assertEqual(b1.shape, (3, 2))
 
 
 if __name__ == '__main__':

@@ -820,22 +820,22 @@ class BroadcastArray(ArrayContainer):
         # simply copy the existing broadcast, and apply this broadcast on
         # top of it (in a new BroadcastArray instance).
         if isinstance(array, BroadcastArray):
-            orig = array._broadcast_dict.copy()
+            new_broadcast_dict = array._broadcast_dict.copy()
+            leading_shape = tuple(leading_shape) + array._leading_shape
             array = array.array
-            orig.update(broadcast)
-            broadcast = orig
+            new_broadcast_dict.update(broadcast)
+            broadcast = new_broadcast_dict
 
         super(BroadcastArray, self).__init__(array)
         self._broadcast_dict = broadcast
 
         # Compute the broadcast shape.
-        shape = BroadcastArray.shape_from_broadcast_dict(self.array.shape,
-                                                         broadcast)
+        shape = self._shape_from_broadcast_dict(self.array.shape, broadcast)
         for length in leading_shape:
             if length < 1:
                 raise ValueError('Leading shape must all be >=1.')
         self._leading_shape = tuple(leading_shape)
-        self._broadcast_shape = shape
+        self._broadcast_shape = tuple(shape)
         self._shape = self._leading_shape + self._broadcast_shape
 
     @property
@@ -891,28 +891,34 @@ class BroadcastArray(ArrayContainer):
             sub_array = self.array
         else:
             sub_array = self.array[tuple(array_keys)]
-        return BroadcastArray(sub_array, new_broadcast_dict, leading_shape)
+        return type(self)(sub_array, new_broadcast_dict, leading_shape)
 
     @classmethod
     def broadcast_arrays(cls, array1, array2):
         """
-        Given two arrays, if broadcasting needs to take place on either arrays
-        to make their shapes comparable, create BroadcastArrays for each.
+        Broadcast two arrays against each other.
+
+        Returns
+        -------
+        broadcast_array1 : array1 or a broadcast of array1
+        broadcast_array2 : array2 or a broadcast of array2
+            The returned arrays will be broadcast against each other.
+            Any array which is already in full broadcast shape will be
+            returned unchanged.
 
         """
         shape, bcast_kwargs1, bcast_kwargs2 = (
-            BroadcastArray.compute_broadcast_kwargs(array1.shape,
-                                                    array2.shape))
-        if bcast_kwargs1['broadcast'] or bcast_kwargs1['leading_shape']:
-            array1 = BroadcastArray(array1, **bcast_kwargs1)
+            cls._compute_broadcast_kwargs(array1.shape, array2.shape))
+        if any(bcast_kwargs1.values()):
+            array1 = cls(array1, **bcast_kwargs1)
 
-        if bcast_kwargs2['broadcast'] or bcast_kwargs2['leading_shape']:
-            array2 = BroadcastArray(array2, **bcast_kwargs2)
+        if any(bcast_kwargs2.values()):
+            array2 = cls(array2, **bcast_kwargs2)
 
         return array1, array2
 
     @staticmethod
-    def compute_broadcast_shape(shape1, shape2):
+    def _compute_broadcast_shape(shape1, shape2):
         """
         Given two shapes, use numpy's broadcasting rules to compute the
         broadcasted shape.
@@ -949,7 +955,7 @@ class BroadcastArray(ArrayContainer):
         return tuple(shape)
 
     @classmethod
-    def compute_broadcast_kwargs(cls, shape1, shape2):
+    def _compute_broadcast_kwargs(cls, shape1, shape2):
         """
         Given two shapes, compute the broadcast shape, along with the keywords
         needed to produce BroadcastArrays with arrays of given shape.
@@ -971,7 +977,7 @@ class BroadcastArray(ArrayContainer):
             shape.
 
         """
-        full_shape = cls.compute_broadcast_shape(shape1, shape2)
+        full_shape = cls._compute_broadcast_shape(shape1, shape2)
 
         bcast_kwargs1 = {'broadcast': {}, 'leading_shape': ()}
         bcast_kwargs2 = {'broadcast': {}, 'leading_shape': ()}
@@ -997,7 +1003,7 @@ class BroadcastArray(ArrayContainer):
         return full_shape, bcast_kwargs1, bcast_kwargs2
 
     @classmethod
-    def shape_from_broadcast_dict(cls, orig_shape, broadcast_dict):
+    def _shape_from_broadcast_dict(cls, orig_shape, broadcast_dict):
         """Using a broadcast dictionary, compute the broadcast shape."""
         shape = list(orig_shape)
         for axis, length in broadcast_dict.items():
@@ -1014,10 +1020,10 @@ class BroadcastArray(ArrayContainer):
         return tuple(shape)
 
     @classmethod
-    def broadcast_numpy_array(cls, array, broadcast_dict, leading_shape=()):
+    def _broadcast_numpy_array(cls, array, broadcast_dict, leading_shape=()):
         """Broadcast a numpy array according to the broadcast_dict."""
         from numpy.lib.stride_tricks import as_strided
-        shape = cls.shape_from_broadcast_dict(array.shape, broadcast_dict)
+        shape = cls._shape_from_broadcast_dict(array.shape, broadcast_dict)
         shape = tuple(leading_shape) + shape
         strides = [0] * len(leading_shape) + list(array.strides)
         for broadcast_axis in broadcast_dict:
@@ -1026,20 +1032,17 @@ class BroadcastArray(ArrayContainer):
 
     def ndarray(self):
         array = super(BroadcastArray, self).ndarray()
-        return BroadcastArray.broadcast_numpy_array(array,
-                                                    self._broadcast_dict,
-                                                    self._leading_shape)
+        return self._broadcast_numpy_array(array, self._broadcast_dict,
+                                           self._leading_shape)
 
     def masked_array(self):
         ma = super(BroadcastArray, self).masked_array()
         mask = ma.mask
-        array = BroadcastArray.broadcast_numpy_array(ma.data,
-                                                     self._broadcast_dict,
-                                                     self._leading_shape)
+        array = self._broadcast_numpy_array(ma.data, self._broadcast_dict,
+                                            self._leading_shape)
         if isinstance(mask, np.ndarray):
-            mask = BroadcastArray.broadcast_numpy_array(mask,
-                                                        self._broadcast_dict,
-                                                        self._leading_shape)
+            mask = self._broadcast_numpy_array(mask, self._broadcast_dict,
+                                               self._leading_shape)
         return np.ma.masked_array(array, mask=mask)
 
 
