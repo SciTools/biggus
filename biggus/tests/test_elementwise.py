@@ -17,6 +17,7 @@
 import unittest
 
 import numpy as np
+from numpy.testing import assert_array_equal
 
 import biggus
 from biggus.tests import AccessCounter
@@ -89,13 +90,23 @@ class TestElementwise(unittest.TestCase):
     def test_power(self):
         self._test_elementwise(biggus.power, np.power)
 
+    def test_add_integer(self):
+        # Check that the ElementWise functionality accepts numpy arrays,
+        # and the result is as expected.
+        r = biggus.add(np.arange(3) * 2, 5)
+        assert_array_equal(r.ndarray(), [5, 7, 9])
+
+    def test_divide_float(self):
+        r = biggus.divide(np.arange(3.), 0.5)
+        assert_array_equal(r.ndarray(), [0., 2., 4.])
+
     def test_add_nd_array(self):
         # Check that the ElementWise functionality accepts numpy arrays,
         # and the result is as expected.
-        r = biggus.add(np.arange(12), np.arange(12))
+        r = biggus.add(np.arange(4), np.arange(4) * 2)
         self.assertIsInstance(r._array1, biggus.NumpyArrayAdapter)
         self.assertIsInstance(r._array2, biggus.NumpyArrayAdapter)
-        self.assertEqual(r.ndarray()[-1], 22)
+        assert_array_equal(r.ndarray(), [0, 3, 6, 9])
 
     def test_add_non_supported_type(self):
         # Check that the ElementWise functionality raises a TypeError

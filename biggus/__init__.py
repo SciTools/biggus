@@ -2945,12 +2945,14 @@ def ensure_array(array):
     :class:`Array` else a TypeError will be raised.
 
     """
-    if isinstance(array, np.ndarray):
-        array = NumpyArrayAdapter(array)
-
-    elif not isinstance(array, Array):
-        raise TypeError('The given array should be a `biggus.Array` '
-                        'instance, got {}.'.format(type(array)))
+    if not isinstance(array, Array):
+        if isinstance(array, np.ndarray):
+            array = NumpyArrayAdapter(array)
+        elif np.isscalar(array):
+            array = ConstantArray([], array)
+        else:
+            raise TypeError('The given array should be a `biggus.Array` '
+                            'instance, got {}.'.format(type(array)))
     return array
 
 
