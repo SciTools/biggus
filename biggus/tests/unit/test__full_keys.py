@@ -30,7 +30,7 @@ class Test__full_keys(unittest.TestCase):
 
     def assertFullSlice(self, keys, ndim, expected):
         result = _full_keys(keys, ndim)
-        self.assertEqual(result, tuple(expected))
+        assert_array_equal(result, tuple(expected))
 
         # Now check that this is actually the numpy behaviour.
         a = np.empty(range(7, 7 + ndim), dtype=np.bool)
@@ -68,6 +68,11 @@ class Test__full_keys(unittest.TestCase):
     def test_new_axis(self):
         self.assertFullSlice((np.newaxis, ), 2,
                              [np.newaxis, slice(None), slice(None)])
+
+    def test_numpy_and_ellipsis_1d(self):
+        # The key is that Ellipsis needs to be stripped off the keys.
+        self.assertFullSlice((np.array([0, 4, 5, 2]), Ellipsis), 1,
+                             [np.array([0, 4, 5, 2])])
 
     def test_new_axis_lh_and_rh(self):
         self.assertFullSlice((np.newaxis, Ellipsis, None, np.newaxis), 2,

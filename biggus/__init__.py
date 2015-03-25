@@ -63,7 +63,7 @@ import numpy as np
 import numpy.ma as ma
 
 
-__version__ = '0.9.0'
+__version__ = '0.9.1'
 
 
 _SCALAR_KEY_TYPES = (int, np.integer)
@@ -2619,9 +2619,10 @@ def _full_keys(keys, ndim):
     # Numpy allows an extra dimension to be an Ellipsis, we remove it here
     # if Ellipsis is in keys, if this doesn't trigger we will raise an
     # IndexError.
-    if n_keys_non_newaxis - 1 >= ndim and Ellipsis in keys:
+    is_ellipsis = [key is Ellipsis for key in keys]
+    if n_keys_non_newaxis - 1 >= ndim and any(is_ellipsis):
         # Remove the left-most Ellipsis, as numpy does.
-        keys.remove(Ellipsis)
+        keys.pop(is_ellipsis.index(True))
         n_keys_non_newaxis -= 1
 
     if n_keys_non_newaxis > ndim:
