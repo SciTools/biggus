@@ -63,7 +63,7 @@ import numpy as np
 import numpy.ma as ma
 
 
-__version__ = '0.9.1'
+__version__ = '0.10.0'
 
 
 _SCALAR_KEY_TYPES = (int, np.integer)
