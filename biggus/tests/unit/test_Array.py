@@ -16,6 +16,7 @@
 # along with Biggus. If not, see <http://www.gnu.org/licenses/>.
 """Unit tests for `biggus.Array`."""
 
+import sys
 import unittest
 
 import numpy as np
@@ -212,8 +213,12 @@ class Test___mul__(unittest.TestCase, AssertElementwiseMixin):
 class Test___trudiv__(unittest.TestCase, AssertElementwiseMixin):
     def test_array_truediv(self):
         # Div and truediv implement the same interface.
-        self.assertIs(biggus.Array.__truediv__.im_func,
-                      biggus.Array.__div__.im_func)
+        if sys.version_info[0] == 2:
+            self.assertIs(biggus.Array.__truediv__.im_func,
+                          biggus.Array.__div__.im_func)
+        else:
+            self.assertIs(biggus.Array.__truediv__,
+                          biggus.Array.__div__)
 
     def test_other_array(self):
         a = FakeArray([2, 4])
