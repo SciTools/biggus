@@ -516,6 +516,10 @@ class Array(object):
     def dtype(self):
         """The datatype of this virtual array."""
 
+    def astype(self, dtype):
+        """Copy of the array, cast to a specified type."""
+        return AsDataTypeArray(self, dtype)
+
     @abstractproperty
     def shape(self):
         """The shape of the virtual array as a tuple."""
@@ -1053,6 +1057,40 @@ class BroadcastArray(ArrayContainer):
             mask = self._broadcast_numpy_array(mask, self._broadcast_dict,
                                                self._leading_shape)
         return np.ma.masked_array(array, mask=mask)
+
+
+class AsDataTypeArray(ArrayContainer):
+    def __init__(self, array, dtype):
+        """
+        Cast the given array to the specified dtype.
+
+        Parameters
+        ----------
+        array : array like
+            The array to cast to ``dtype``.
+        dtype : valid numpy.dtype argument
+            The dtype to cast the data to. This will be
+            passed through to :func:`numpy.dtype`.
+
+        """
+        super(AsDataTypeArray, self).__init__(array)
+        self._dtype = np.dtype(dtype)
+
+    @property
+    def dtype(self):
+        return self._dtype
+
+    def astype(self, dtype):
+        return type(self)(self.array, dtype)
+
+    def ndarray(self):
+        return super(AsDataTypeArray,
+                     self).ndarray().astype(self.dtype)
+
+    def masked_array(self):
+        dtype = self._dtype
+        return super(AsDataTypeArray,
+                     self).masked_array().astype(self.dtype)
 
 
 class ConstantArray(Array):
