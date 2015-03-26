@@ -100,7 +100,7 @@ class Test___str__(unittest.TestCase):
 
     def test_1d(self):
         self._test(4, 'f8',
-                   "<Array shape=(4,) dtype=dtype('float64') size=32 B>")
+                   "<Array shape=(4) dtype=dtype('float64') size=32 B>")
 
     def test_nd(self):
         self._test((2, 6, 5), 'f8',
@@ -108,35 +108,35 @@ class Test___str__(unittest.TestCase):
 
     def test_1023(self):
         self._test(1023, 'i1',
-                   "<Array shape=(1023,) dtype=dtype('int8') size=1023 B>")
+                   "<Array shape=(1023) dtype=dtype('int8') size=1023 B>")
 
     def test_1024(self):
         self._test(1024, 'i1',
-                   "<Array shape=(1024,) dtype=dtype('int8') size=1.00 KiB>")
+                   "<Array shape=(1024) dtype=dtype('int8') size=1.00 KiB>")
 
     def test_40000(self):
         self._test(40000, 'i1',
-                   "<Array shape=(40000,) dtype=dtype('int8') size=39.06 KiB>")
+                   "<Array shape=(40000) dtype=dtype('int8') size=39.06 KiB>")
 
     def test_999999(self):
         self._test(
             9999999, 'i1',
-            "<Array shape=(9999999,) dtype=dtype('int8') size=9.54 MiB>")
+            "<Array shape=(9999999) dtype=dtype('int8') size=9.54 MiB>")
 
     def test_999999999(self):
         self._test(
             9999999999, 'i1',
-            "<Array shape=(9999999999,) dtype=dtype('int8') size=9.31 GiB>")
+            "<Array shape=(9999999999) dtype=dtype('int8') size=9.31 GiB>")
 
     def test_999999999999(self):
         self._test(
             9999999999999, 'i1',
-            "<Array shape=(9999999999999,) dtype=dtype('int8') size=9.09 TiB>")
+            "<Array shape=(9999999999999) dtype=dtype('int8') size=9.09 TiB>")
 
     def test_999999999999999(self):
         self._test(
             9999999999999999, 'i1',
-            "<Array shape=(9999999999999999,) dtype=dtype('int8') "
+            "<Array shape=(9999999999999999) dtype=dtype('int8') "
             "size=9094.95 TiB>")
 
 
