@@ -32,6 +32,12 @@ class Test___init__(unittest.TestCase):
         self.assertIs(array.array, orig)
 
 
+class Test___getitem__(unittest.TestCase):
+    def test_dtype_preserved(self):
+        sliced = NumpyArrayAdapter(np.arange(4)).astype('>f4')[:2]
+        self.assertEqual(sliced.ndarray().dtype, '>f4')
+
+
 class Test_ndarray(unittest.TestCase):
     def test_nd_array(self):
         orig = np.arange(3)

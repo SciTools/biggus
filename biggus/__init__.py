@@ -656,10 +656,12 @@ class ArrayContainer(Array):
     def shape(self):
         return self.array.shape
 
-    def _getitem_full_keys(self, keys):
-        # We override _getitem_full_keys, not __getitem__, here, allowing
-        # containers to be indexed with np.newaxis.
-        return self.array._getitem_full_keys(keys)
+    def __getitem__(self, keys):
+        # Pass indexing to the contained array. For ArrayContainer types
+        # which implement their own complex __getitem__ behaviour,
+        # overriding this and _getitem_full_keys may be necessary. See also
+        # BroadcastArray and TransposedArray.
+        return self.array.__getitem__(keys)
 
     def ndarray(self):
         try:
@@ -854,6 +856,10 @@ class BroadcastArray(ArrayContainer):
     @property
     def shape(self):
         return self._shape
+
+    def __getitem__(self, keys):
+        # Inherit the behaviour from Array, **not** from ArrayContainer.
+        return super(ArrayContainer, self).__getitem__(keys)
 
     def _getitem_full_keys(self, keys):
         array_keys = []
@@ -1082,6 +1088,12 @@ class AsDataTypeArray(ArrayContainer):
 
     def astype(self, dtype):
         return type(self)(self.array, dtype)
+
+    def __getitem__(self, keys):
+        # Apply the indexing to the contained array, then instantly
+        # re-apply the astype.
+        return type(self)(super(AsDataTypeArray, self).__getitem__(keys),
+                          self.dtype)
 
     def ndarray(self):
         return super(AsDataTypeArray,
@@ -1554,6 +1566,11 @@ class TransposedArray(ArrayContainer):
     @property
     def ndim(self):
         return self.array.ndim
+
+    def __getitem__(self, keys):
+        # Inherit the behaviour from Array, **not** from ArrayContainer,
+        # thus meaning we must implement _getitem_full_keys.
+        return super(ArrayContainer, self).__getitem__(keys)
 
     def _getitem_full_keys(self, keys):
         new_transpose_order = list(self.axes)
