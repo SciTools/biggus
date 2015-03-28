@@ -490,12 +490,16 @@ class Array(object):
         return np.asarray(result, dtype=dtype)
 
     def __str__(self):
-        fmt = '<Array shape={} dtype={!r} size={}>'
-        return fmt.format(self.shape, self.dtype, size(self))
+        fmt = '<Array shape=({}) dtype={!r} size={}>'
+        return fmt.format(', '.join(str(items) for items in self.shape),
+                          self.dtype,
+                          size(self))
 
     def __repr__(self):
-        return '<{} shape={} dtype={!r}>'.format(type(self).__name__,
-                                                 self.shape, self.dtype)
+        fmt = '<{} shape=({}) dtype={!r}>'
+        return fmt.format(type(self).__name__,
+                          ', '.join(str(items) for items in self.shape),
+                          self.dtype)
 
     @property
     def fill_value(self):
