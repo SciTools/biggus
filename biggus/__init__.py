@@ -485,6 +485,12 @@ class Array(object):
 
     __hash__ = None
 
+    #: Indicates to client code that the object supports
+    #: "orthogonal indexing", which means that slices that are 1d arrays
+    #: or lists slice along each dimension independently. This behavior
+    #: is similar to Fortran or Matlab, but different than numpy.
+    __orthogonal_indexing__ = True
+
     def __array__(self, dtype=None):
         result = self.ndarray()
         return np.asarray(result, dtype=dtype)
