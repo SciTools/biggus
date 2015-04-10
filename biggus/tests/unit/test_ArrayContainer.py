@@ -37,6 +37,11 @@ class Test_ndarray(unittest.TestCase):
         assert_array_equal(array.ndarray(),
                            np.arange(24))
 
+    def test_getitem(self):
+        orig = NumpyArrayAdapter(np.arange(4))
+        r = ArrayContainer(orig)[:2]
+        assert_array_equal(r.ndarray(), orig[:2])
+
 
 class Test_masked_array(unittest.TestCase):
     def test_biggus_array(self):

@@ -147,6 +147,14 @@ class Test___hash__(unittest.TestCase):
             hash(array)
 
 
+class Test_astype(unittest.TestCase):
+    def test(self):
+        array = FakeArray((2, 3, 4))
+        result = array.astype('>f32')
+        self.assertIsInstance(result, biggus.AsDataTypeArray)
+        self.assertEqual(result.dtype, '>f32')
+
+
 class Test_transpose(unittest.TestCase):
     def test_default(self):
         array = FakeArray((2, 3, 4))
