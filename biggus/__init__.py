@@ -1789,7 +1789,7 @@ class LinearMosaic(Array):
         keys = []
         non_full_slice_found = False
         for key in full_keys[::-1]:
-            if key != slice(None):
+            if isinstance(key, np.ndarray) or key != slice(None):
                 non_full_slice_found = True
             if non_full_slice_found:
                 keys.append(key)

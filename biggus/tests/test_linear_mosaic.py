@@ -219,6 +219,17 @@ class TestLinearMosaic(unittest.TestCase):
                   [8, 9, 10, 11, 10, 11, 12, 13, 14]]
         np.testing.assert_array_equal(result, target)
 
+    def test__getitem_full_keys(self):
+        full_keys = (np.array([0, 1]), slice(None, None, None))
+        tile1 = self._tile((5, 11))
+        tile2 = self._tile((5, 8))
+        mosaic = biggus.LinearMosaic([tile1, tile2], 1)
+        result = mosaic._getitem_full_keys(full_keys)
+        expected = biggus.LinearMosaic([tile1, tile2], 1)
+        result_array = result.ndarray()
+        expected_array = expected.ndarray()[0:2, :]
+        np.testing.assert_array_equal(result_array, expected_array)
+
 
 if __name__ == '__main__':
     unittest.main()
