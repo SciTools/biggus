@@ -2742,8 +2742,12 @@ class _Elementwise(ComputedArray):
         # TypeError will be raised if not broadcastable.
         array1, array2 = BroadcastArray.broadcast_arrays(array1, array2)
 
-        # TODO: Type-promotion
-        assert array1.dtype == array2.dtype
+        # Type-promotion - The resultant dtype depends on both the array
+        # dtypes and the operation. Avoid using np.find_common_dtype() here,
+        # as integer division yields a float, whereas standard type coercion
+        # rules with find_common_dtype yields an integer.
+        self._dtype = numpy_op(np.ones(1, dtype=array1.dtype),
+                               np.ones(1, dtype=array2.dtype)).dtype
         self._array1 = array1
         self._array2 = array2
         self._numpy_op = numpy_op
@@ -2751,7 +2755,7 @@ class _Elementwise(ComputedArray):
 
     @property
     def dtype(self):
-        return self._array1.dtype
+        return self._dtype
 
     @property
     def shape(self):
