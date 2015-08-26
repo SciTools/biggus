@@ -1907,11 +1907,10 @@ class LinearMosaic(Array):
                         start = axis_indices[0]
                         step = 1
                         stop = start + 1
+                        tile_slice[axis] = slice(start, stop, step)
                     else:
-                        start = axis_indices[0]
-                        step = axis_indices[1] - start
-                        stop = axis_indices[-1] + step
-                    tile_slice[axis] = slice(start, stop, step)
+                        tile_slice[axis] = axis_indices
+
                     tiles.append(tile[tuple(tile_slice)])
                 if isinstance(axis_key, slice) and \
                         axis_key.step is not None and axis_key.step < 0:

@@ -173,6 +173,13 @@ class TestLinearMosaic(unittest.TestCase):
         target = 6
         np.testing.assert_array_equal(result, target)
 
+        result = mosaic[:, (0, 1, 3)]
+        target = [[0,  1,  3],
+                  [4,  5,  7],
+                  [8,  9, 11]]
+
+        np.testing.assert_array_equal(result, target)
+
         with self.assertRaises(TypeError):
             result = mosaic['foo'].ndarray()
 
