@@ -25,6 +25,8 @@ import numpy as np
 import biggus
 from biggus import Array
 
+import operator
+
 
 RESULT_NDARRAY = np.arange(12).reshape(3, 4)
 
@@ -237,7 +239,7 @@ class Test___div__(unittest.TestCase, AssertElementwiseMixin):
     def test_other_array(self):
         a = FakeArray([2, 4])
         b = FakeArray([2, 4])
-        r = a / b
+        r = operator.div(a, b)
         self.assertIsInstance(r, biggus._Elementwise)
         self.assertElementwise(r, biggus.divide(a, b))
 
