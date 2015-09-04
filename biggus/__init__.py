@@ -108,8 +108,6 @@ class Engine(object):
         individual arrays one by one.
 
         """
-        print('ndarray 111')
-        
         pass
 
 
@@ -465,7 +463,6 @@ class AllThreadedEngine(Engine):
         return self._evaluate(arrays, True)
 
     def ndarrays(self, *arrays):
-        print('ndarrays 468')
         return self._evaluate(arrays, False)
 
 
@@ -575,7 +572,6 @@ class Array(object):
         virtual array.
 
         """
-        print('ndarray 578')
 
     @abstractmethod
     def masked_array(self):
@@ -681,7 +677,6 @@ class ArrayContainer(Array):
 
     def ndarray(self):
     
-        print('ndarray 682')
         try:
             return self.array.ndarray()
         except AttributeError:
@@ -821,7 +816,6 @@ class NewAxesArray(ArrayContainer):
         return new_array
 
     def ndarray(self):
-        print('ndarray 822')
         array = super(NewAxesArray, self).ndarray()
         return array.__getitem__(self._newaxis_keys())
 
@@ -1069,7 +1063,6 @@ class BroadcastArray(ArrayContainer):
         return as_strided(array, shape=tuple(shape), strides=tuple(strides))
 
     def ndarray(self):
-        print('ndarray 1070')
         array = super(BroadcastArray, self).ndarray()
         return self._broadcast_numpy_array(array, self._broadcast_dict,
                                            self._leading_shape)
@@ -1116,7 +1109,6 @@ class AsDataTypeArray(ArrayContainer):
                           self.dtype)
 
     def ndarray(self):
-        print('ndarray 1117')
         return super(AsDataTypeArray,
                      self).ndarray().astype(self.dtype)
 
@@ -1175,7 +1167,6 @@ class ConstantArray(Array):
         return ConstantArray(shape, self.value, self._dtype)
 
     def ndarray(self):
-        print('ndarray 1176')
         result = np.empty(self.shape, self._dtype)
         result.fill(self.value)
         return result
@@ -1388,7 +1379,6 @@ class _ArrayAdapter(Array):
         pass
 
     def ndarray(self):
-        print('ndarray 1389')
         array = self._apply_keys()
         # We want the shape of the result to match the shape of the
         # Array, so where we've ended up with an array-scalar,
@@ -1623,7 +1613,6 @@ class TransposedArray(ArrayContainer):
         return TransposedArray(new_arr, new_transpose_order)
 
     def ndarray(self):
-        print('ndarray 1624')
         array = super(TransposedArray, self).ndarray()
         return array.transpose(self.axes)
 
@@ -1713,7 +1702,6 @@ class ArrayStack(Array):
         self._stack[keys] = value
 
     def ndarray(self):
-        print('ndarray 1714')
         data = np.empty(self.shape, dtype=self.dtype)
         for index in np.ndindex(self._stack.shape):
             data[index] = self._stack[index].ndarray()
@@ -1944,7 +1932,6 @@ class LinearMosaic(Array):
         return result
 
     def ndarray(self):
-        print('ndarray 1945')
         data = np.empty(self.shape, dtype=self.dtype)
         offset = 0
         indices = [slice(None)] * self.ndim
@@ -1979,7 +1966,6 @@ def ndarrays(arrays):
     individual arrays one by one.
 
     """
-    print('ndarrays 1980')
     return engine.ndarrays(*arrays)
 
 
@@ -2484,7 +2470,6 @@ class _Aggregation(ComputedArray):
                             self._kwargs)
 
     def ndarray(self):
-        print('ndarray 2485')
         result, = engine.ndarrays(self)
         return result
 
@@ -2794,7 +2779,6 @@ class _Elementwise(ComputedArray):
         return result
 
     def ndarray(self):
-        print('ndarray 2795')
         result = self._calc(self._numpy_op)
         return result
 
