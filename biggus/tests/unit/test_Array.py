@@ -220,13 +220,6 @@ class Test___mul__(unittest.TestCase, AssertElementwiseMixin):
 
 
 class Test___floordiv__(unittest.TestCase, AssertElementwiseMixin):
-    def test_div_is_floordiv(self):
-        # Div and floordiv implement the same interface.
-        # Python3 doesn't care about div, just floordiv and truediv.
-        if sys.version_info[0] == 2:
-            self.assertIs(biggus.Array.__floordiv__.im_func,
-                          biggus.Array.__div__.im_func)
-
     def test_other_array(self):
         a = FakeArray([2, 4])
         b = FakeArray([2, 4])
@@ -238,6 +231,20 @@ class Test___floordiv__(unittest.TestCase, AssertElementwiseMixin):
         a = FakeArray([2, 2])
         with self.assertRaisesRegexp(TypeError, 'unsupported operand type'):
             a // None
+
+
+class Test___div__(unittest.TestCase, AssertElementwiseMixin):
+    def test_other_array(self):
+        a = FakeArray([2, 4])
+        b = FakeArray([2, 4])
+        r = a / b
+        self.assertIsInstance(r, biggus._Elementwise)
+        self.assertElementwise(r, biggus.divide(a, b))
+
+    def test_other_no_good(self):
+        a = FakeArray([2, 2])
+        with self.assertRaisesRegexp(TypeError, 'unsupported operand type'):
+            a / None
 
 
 class Test___trudiv__(unittest.TestCase, AssertElementwiseMixin):
