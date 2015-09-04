@@ -676,7 +676,6 @@ class ArrayContainer(Array):
         return self.array.__getitem__(keys)
 
     def ndarray(self):
-    
         try:
             return self.array.ndarray()
         except AttributeError:
@@ -2849,19 +2848,6 @@ def power(a, b):
     """
     return _Elementwise(a, b, np.power, np.ma.power)
 
-def exp(a):
-    """
-    Return the elementwise evaluation of `exp(a)` as another Array.
-
-    """
-    return _Elementwise(np.exp(1), a, np.power, np.ma.power)
-    
-def log(a):
-    """
-    Return the elementwise evaluation of the natural `log(a)` as another Array.
-
-    """
-    return _Elementwise(a, a, np.log, np.ma.log)
 
 def _sliced_shape(shape, keys):
     """
