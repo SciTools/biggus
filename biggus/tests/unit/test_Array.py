@@ -25,8 +25,6 @@ import numpy as np
 import biggus
 from biggus import Array
 
-import operator
-
 
 RESULT_NDARRAY = np.arange(12).reshape(3, 4)
 
@@ -239,14 +237,13 @@ class Test___div__(unittest.TestCase, AssertElementwiseMixin):
     def test_other_array(self):
         a = FakeArray([2, 4])
         b = FakeArray([2, 4])
-        r = operator.div(a, b)
+        r = a.__div__(b)
         self.assertIsInstance(r, biggus._Elementwise)
         self.assertElementwise(r, biggus.divide(a, b))
 
     def test_other_no_good(self):
         a = FakeArray([2, 2])
-        with self.assertRaisesRegexp(TypeError, 'unsupported operand type'):
-            a / None
+        self.assertIs(a.__div__(None), NotImplemented)
 
 
 class Test___trudiv__(unittest.TestCase, AssertElementwiseMixin):
