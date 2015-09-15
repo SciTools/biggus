@@ -18,12 +18,11 @@
 
 import unittest
 
-import mock
-
 import numpy as np
 
 import biggus
 from biggus import _all_slices
+from biggus.tests import mock
 
 
 class Test__all_slices(unittest.TestCase):

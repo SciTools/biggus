@@ -1,5 +1,10 @@
 import numpy as np
 
+try:
+    from unittest import mock
+except ImportError:
+    import mock
+
 
 class AccessCounter(object):
     """

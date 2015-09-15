@@ -3,5 +3,10 @@ python:
   - "2.7"
   - "3.3"
   - "3.4"
-install: "pip install -r requirements.txt --use-mirrors"
+  - "3.5"
+install:
+  - pip install -r requirements.txt
+  - if [[ "${TRAVIS_PYTHON_VERSION:0:1}" == '2' ]]; then
+      pip install mock;
+    fi
 script: "python setup.py test"

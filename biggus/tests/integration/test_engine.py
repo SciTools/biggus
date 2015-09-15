@@ -18,9 +18,8 @@
 
 import unittest
 
-import mock
-
 import biggus
+from biggus.tests import mock
 
 
 class Test(unittest.TestCase):
