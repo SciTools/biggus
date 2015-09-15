@@ -18,11 +18,11 @@
 
 import unittest
 
-import mock
 import numpy as np
 from numpy.testing import assert_array_equal
 
 from biggus import ensure_array, Array, NumpyArrayAdapter
+from biggus.tests import mock
 
 
 class Test_ensure_array(unittest.TestCase):

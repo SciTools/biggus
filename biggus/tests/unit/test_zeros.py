@@ -18,10 +18,10 @@
 
 import unittest
 
-import mock
 import numpy as np
 
 from biggus import zeros
+from biggus.tests import mock
 
 
 class Test(unittest.TestCase):

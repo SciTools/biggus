@@ -18,9 +18,8 @@
 
 import unittest
 
-import mock
-
 from biggus import _normalise_axis
+from biggus.tests import mock
 
 
 ARRAY = mock.Mock(ndim=9)
