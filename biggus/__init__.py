@@ -911,7 +911,7 @@ class BroadcastArray(ArrayContainer):
                                          '{} with size 1'.format(key, axis))
                     else:
                         # We want to index the broadcast dimension.
-                        array_keys.append(key)
+                        array_keys.append(0)
                         n_axes_removed += 1
                 else:
                     raise NotImplementedError('Indexing with type {} not yet '
