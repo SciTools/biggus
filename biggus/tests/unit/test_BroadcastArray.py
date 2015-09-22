@@ -1,4 +1,4 @@
-# (C) British Crown Copyright 2014, Met Office
+# (C) British Crown Copyright 2014 - 2015, Met Office
 #
 # This file is part of Biggus.
 #
@@ -35,17 +35,17 @@ class Test___init__(unittest.TestCase):
     def test_invalid_broadcast_axis(self):
         msg = 'Axis -1 out of range \[0, 5\)'
         with self.assertRaisesRegexp(ValueError, msg):
-            a = BroadcastArray(np.empty([1, 3, 1, 5, 1]), {-1: 10})
+            BroadcastArray(np.empty([1, 3, 1, 5, 1]), {-1: 10})
 
     def test_invalid_broadcast_length(self):
         msg = 'Axis length must be positive. Got -1.'
         with self.assertRaisesRegexp(ValueError, msg):
-            a = BroadcastArray(np.empty([1, 3, 1, 5, 1]), {0: -1})
+            BroadcastArray(np.empty([1, 3, 1, 5, 1]), {0: -1})
 
     def test_broadcasting_existing_non_len1_dimension(self):
         msg = 'Attempted to broadcast axis 0 which is of length 3.'
         with self.assertRaisesRegexp(ValueError, msg):
-            a = BroadcastArray(np.empty([3]), {0: 5})
+            BroadcastArray(np.empty([3]), {0: 5})
 
     def test_nested_broadcast_avoidance(self):
         orig = np.empty([1, 3, 1, 5, 1])
@@ -105,6 +105,15 @@ class Test___getitem__(unittest.TestCase):
     def test_remove_leading_and_broadcast(self):
         a = BroadcastArray(np.empty([1, 2, 1]), {0: 3, 2: 3}, (2, 2))
         self.assertEqual(a[:1, 0, 0, 0, :].shape, (1, 3))
+
+    def test_scalar_index_of_broadcast_dimension(self):
+        a = BroadcastArray(np.empty((1, 36, 1, 1)), {0: 855, 2: 82, 3: 130})
+        self.assertEqual(a[:, :, 30].shape, (855, 36, 130))
+
+    def test_ndarray_indexing(self):
+        a = BroadcastArray(np.empty((1, 2)), {0: 5})
+        with self.assertRaises(NotImplementedError):
+            self.assertEqual(a[np.array([1, 3, 4])].shape, (3, 2))
 
 
 class Test_ndarray(unittest.TestCase):
