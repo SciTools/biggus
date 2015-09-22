@@ -613,9 +613,21 @@ class Array(object):
         except TypeError:
             return NotImplemented
 
+    def __radd__(self, other):
+        try:
+            return add(other, self)
+        except TypeError:
+            return NotImplemented
+
     def __sub__(self, other):
         try:
             return sub(self, other)
+        except TypeError:
+            return NotImplemented
+
+    def __rsub__(self, other):
+        try:
+            return sub(other, self)
         except TypeError:
             return NotImplemented
 
@@ -625,9 +637,21 @@ class Array(object):
         except TypeError:
             return NotImplemented
 
+    def __rmul__(self, other):
+        try:
+            return multiply(other, self)
+        except TypeError:
+            return NotImplemented
+
     def __floordiv__(self, other):
         try:
             return floor_divide(self, other)
+        except TypeError:
+            return NotImplemented
+
+    def __rfloordiv__(self, other):
+        try:
+            return floor_divide(other, self)
         except TypeError:
             return NotImplemented
 
@@ -637,9 +661,21 @@ class Array(object):
         except TypeError:
             return NotImplemented
 
+    def __rdiv__(self, other):
+        try:
+            return divide(other, self)
+        except TypeError:
+            return NotImplemented
+
     def __truediv__(self, other):
         try:
             return true_divide(self, other)
+        except TypeError:
+            return NotImplemented
+
+    def __rtruediv__(self, other):
+        try:
+            return true_divide(other, self)
         except TypeError:
             return NotImplemented
 
@@ -650,6 +686,24 @@ class Array(object):
             return power(self, other)
         except TypeError:
             return NotImplemented
+
+    def __rpow__(self, other):
+        try:
+            return power(other, self)
+        except TypeError:
+            return NotImplemented
+
+#    def __mod__(self, other):
+#        try:
+#            return mod(self, other)
+#        except TypeError:
+#            return NotImplemented
+#
+#    def __rmod__(self, other):
+#        try:
+#            return mod(self, other)
+#        except TypeError:
+#            return NotImplemented
 
 
 class ArrayContainer(Array):

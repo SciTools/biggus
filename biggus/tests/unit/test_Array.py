@@ -21,6 +21,7 @@ import sys
 import unittest
 
 import numpy as np
+from numpy.testing import assert_array_equal
 
 import biggus
 from biggus import Array
@@ -43,13 +44,13 @@ class FakeArray(Array):
         return self._shape
 
     def __getitem__(self, keys):
-        pass
+        raise ValueError('getitem called on fake array.')
 
     def ndarray(self):
         return RESULT_NDARRAY
 
     def masked_array(self, keys):
-        pass
+        raise ValueError('masked_array called on fake array.')
 
 
 class Test___array__(unittest.TestCase):
@@ -61,7 +62,7 @@ class Test___array__(unittest.TestCase):
     def test_dtype(self):
         array = FakeArray((2, 3))
         result = array.__array__('i4')
-        np.testing.assert_array_equal(result, RESULT_NDARRAY)
+        assert_array_equal(result, RESULT_NDARRAY)
         self.assertEqual(result.dtype, np.dtype('i4'))
 
 
@@ -190,6 +191,12 @@ class Test___add__(unittest.TestCase, AssertElementwiseMixin):
         with self.assertRaisesRegexp(TypeError, 'unsupported operand type'):
             a + None
 
+    def test___radd__(self):
+        a = biggus.NumpyArrayAdapter(RESULT_NDARRAY)
+        r = 5 + a
+        self.assertIsInstance(r, biggus._Elementwise)
+        assert_array_equal(r.ndarray(), 5 + RESULT_NDARRAY)
+
 
 class Test___sub__(unittest.TestCase, AssertElementwiseMixin):
     def test_other_array(self):
@@ -203,6 +210,12 @@ class Test___sub__(unittest.TestCase, AssertElementwiseMixin):
         a = FakeArray([2, 2])
         with self.assertRaisesRegexp(TypeError, 'unsupported operand type'):
             a - None
+
+    def test___rsub__(self):
+        a = biggus.NumpyArrayAdapter(RESULT_NDARRAY)
+        r = 5 - a
+        self.assertIsInstance(r, biggus._Elementwise)
+        assert_array_equal(r.ndarray(), 5 - RESULT_NDARRAY)
 
 
 class Test___mul__(unittest.TestCase, AssertElementwiseMixin):
@@ -218,6 +231,12 @@ class Test___mul__(unittest.TestCase, AssertElementwiseMixin):
         with self.assertRaisesRegexp(TypeError, 'unsupported operand type'):
             a * None
 
+    def test___rmul__(self):
+        a = biggus.NumpyArrayAdapter(RESULT_NDARRAY)
+        r = 5 * a
+        self.assertIsInstance(r, biggus._Elementwise)
+        assert_array_equal(r.ndarray(), 5 * RESULT_NDARRAY)
+
 
 class Test___floordiv__(unittest.TestCase, AssertElementwiseMixin):
     def test_other_array(self):
@@ -232,6 +251,12 @@ class Test___floordiv__(unittest.TestCase, AssertElementwiseMixin):
         with self.assertRaisesRegexp(TypeError, 'unsupported operand type'):
             a // None
 
+    def test___rfloordiv__(self):
+        a = biggus.NumpyArrayAdapter(RESULT_NDARRAY + 10)
+        r = 5 // a
+        self.assertIsInstance(r, biggus._Elementwise)
+        assert_array_equal(r.ndarray(), 5 // (RESULT_NDARRAY + 10))
+
 
 class Test___div__(unittest.TestCase, AssertElementwiseMixin):
     def test_other_array(self):
@@ -244,6 +269,14 @@ class Test___div__(unittest.TestCase, AssertElementwiseMixin):
     def test_other_no_good(self):
         a = FakeArray([2, 2])
         self.assertIs(a.__div__(None), NotImplemented)
+
+    def test___rdiv__(self):
+        # We only have rdiv on py2.
+        if sys.version_info[0] == 2:
+            a = biggus.NumpyArrayAdapter(RESULT_NDARRAY + 10)
+            r = 5 / a
+            self.assertIsInstance(r, biggus._Elementwise)
+            assert_array_equal(r.ndarray(), 5 / (RESULT_NDARRAY + 10))
 
 
 class Test___trudiv__(unittest.TestCase, AssertElementwiseMixin):
@@ -259,6 +292,12 @@ class Test___trudiv__(unittest.TestCase, AssertElementwiseMixin):
         with self.assertRaisesRegexp(TypeError, 'unsupported operand type'):
             a / None
 
+    def test___rtrudiv__(self):
+        a = biggus.NumpyArrayAdapter(RESULT_NDARRAY + 10)
+        r = 5 / a
+        self.assertIsInstance(r, biggus._Elementwise)
+        assert_array_equal(r.ndarray(), 5 / (RESULT_NDARRAY + 10))
+
 
 class Test___pow__(unittest.TestCase, AssertElementwiseMixin):
     def test_other_array(self):
@@ -272,6 +311,12 @@ class Test___pow__(unittest.TestCase, AssertElementwiseMixin):
         a = FakeArray([2, 2])
         with self.assertRaisesRegexp(TypeError, 'unsupported operand type'):
             a ** None
+
+    def test___rpow__(self):
+        a = biggus.NumpyArrayAdapter(RESULT_NDARRAY)
+        r = 5 ** a
+        self.assertIsInstance(r, biggus._Elementwise)
+        assert_array_equal(r.ndarray(), 5 ** RESULT_NDARRAY)
 
 
 if __name__ == '__main__':
