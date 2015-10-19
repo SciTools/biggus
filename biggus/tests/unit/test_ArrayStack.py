@@ -196,7 +196,6 @@ class Test__deepcopy__(unittest.TestCase):
         orig = ArrayStack(np.array([[adapt(0), adapt(1)],
                                     [adapt(2), adapt(3)]],
                                    order=order, dtype=object))
-        assert_array_equal(expected, orig.ndarray())
         copied = copy.deepcopy(orig)
         assert_array_equal(expected, copied.ndarray())
 
