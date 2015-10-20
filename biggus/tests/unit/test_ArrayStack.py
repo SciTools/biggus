@@ -1,4 +1,4 @@
-# (C) British Crown Copyright 2014, Met Office
+# (C) British Crown Copyright 2014 - 2015, Met Office
 #
 # This file is part of Biggus.
 #
@@ -16,9 +16,11 @@
 # along with Biggus. If not, see <http://www.gnu.org/licenses/>.
 """Unit tests for `biggus.ArrayStack`."""
 
+import copy
 import unittest
 
 import numpy as np
+from numpy.testing import assert_array_equal
 
 from biggus import Array, ArrayStack, NumpyArrayAdapter, ConstantArray
 from biggus.tests import mock
@@ -174,6 +176,28 @@ class Test___getitem__(unittest.TestCase):
 
     def test_newaxis_trailing(self):
         self.assertEqual(self.a[..., np.newaxis].shape, (2, 4, 3, 1))
+
+
+class Test__deepcopy__(unittest.TestCase):
+    # Numpy <= 1.10 has a bug which prevents a deepcopy of an F-order
+    # object array.
+    # See https://github.com/SciTools/biggus/issues/157.
+    def test_fortran_order(self):
+        self.check('f')
+
+    def test_c_order(self):
+        self.check('c')
+
+    def check(self, order):
+        def adapt(value):
+            return NumpyArrayAdapter(np.array(value))
+
+        expected = np.array([[0, 1], [2, 3]], order=order)
+        orig = ArrayStack(np.array([[adapt(0), adapt(1)],
+                                    [adapt(2), adapt(3)]],
+                                   order=order, dtype=object))
+        copied = copy.deepcopy(orig)
+        assert_array_equal(expected, copied.ndarray())
 
 
 if __name__ == '__main__':
