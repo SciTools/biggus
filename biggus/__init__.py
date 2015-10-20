@@ -55,9 +55,12 @@ from __future__ import division
 from abc import ABCMeta, abstractproperty, abstractmethod
 import __builtin__
 import collections
+import functools
 import itertools
 import threading
 import Queue
+import sys
+import warnings
 
 import numpy as np
 import numpy.ma as ma
@@ -1166,7 +1169,6 @@ class AsDataTypeArray(ArrayContainer):
                      self).ndarray().astype(self.dtype)
 
     def masked_array(self):
-        dtype = self._dtype
         return super(AsDataTypeArray,
                      self).masked_array().astype(self.dtype)
 
@@ -2789,20 +2791,55 @@ class _ElementwiseStreamsHandler(_StreamsHandler):
 
 
 class _Elementwise(ComputedArray):
-    def __init__(self, array1, array2, numpy_op, ma_op):
+    """"
+    Represents an elementwise operation applied to one or two input arrays.
+
+    Elementwise operations are defined by passing an appropriate function,
+    and optionally an equivalent masked_array function. Examples of elementwise
+    operations included addition (two inputs) and cos (one input).
+
+    """
+    def __init__(self, array1, array2, numpy_op, ma_op=None):
         array1 = ensure_array(array1)
-        array2 = ensure_array(array2)
 
-        # Broadcast both arrays to the full broadcast shape.
-        # TypeError will be raised if not broadcastable.
-        array1, array2 = BroadcastArray.broadcast_arrays(array1, array2)
+        expected_n_arrays = None
+        if isinstance(numpy_op, np.ufunc):
+            expected_n_arrays = numpy_op.nin
+            if numpy_op.nout != 1:
+                raise TypeError('Dual output Elementwise ufuncs not yet '
+                                'supported.')
 
-        # Type-promotion - The resultant dtype depends on both the array
-        # dtypes and the operation. Avoid using np.find_common_dtype() here,
-        # as integer division yields a float, whereas standard type coercion
-        # rules with find_common_dtype yields an integer.
-        self._dtype = numpy_op(np.ones(1, dtype=array1.dtype),
-                               np.ones(1, dtype=array2.dtype)).dtype
+        if array2 is None:
+            # Unary elementwise.
+
+            if expected_n_arrays is not None and expected_n_arrays != 1:
+                # Trigger an exception (TypeError).
+                numpy_op(np.array([1], dtype=array1.dtype), None)
+
+            # Catch warnings for dtype calculation. This typically occurs with
+            # operations which don't work well with 1 (e.g. arctanh).
+            with warnings.catch_warnings(record=True):
+                dtype = numpy_op(np.array([1], dtype=array1.dtype)).dtype
+        else:
+            if expected_n_arrays is not None and expected_n_arrays != 2:
+                # Trigger an exception (TypeError).
+                numpy_op(np.array([1], dtype=array1.dtype))
+
+            # Dual input elementwise
+            array2 = ensure_array(array2)
+
+            # Broadcast both arrays to the full broadcast shape.
+            # TypeError will be raised if not broadcastable.
+            array1, array2 = BroadcastArray.broadcast_arrays(array1, array2)
+
+            # Type-promotion - The resultant dtype depends on both the array
+            # dtypes and the operation. Avoid using np.find_common_dtype(),
+            # here, as integer division yields a float, whereas standard type
+            # coercion rules with find_common_dtype yields an integer.
+            dtype = numpy_op(np.ones(1, dtype=array1.dtype),
+                             np.ones(1, dtype=array2.dtype)).dtype
+
+        self._dtype = dtype
         self._array1 = array1
         self._array2 = array2
         self._numpy_op = numpy_op
@@ -2818,15 +2855,23 @@ class _Elementwise(ComputedArray):
 
     @property
     def sources(self):
-        return (self._array1, self._array2)
+        if self._array2 is None:
+            result = (self._array1, )
+        else:
+            result = (self._array1, self._array2)
+        return result
 
     def _getitem_full_keys(self, keys):
-        return _Elementwise(self._array1[keys], self._array2[keys],
-                            self._numpy_op, self._ma_op)
+        if self._array2 is None:
+            result = _Elementwise(self._array1[keys],
+                                  self._numpy_op, self._ma_op)
+        else:
+            result = _Elementwise(self._array1[keys], self._array2[keys],
+                                  self._numpy_op, self._ma_op)
+        return result
 
     def _calc(self, op):
-        operands = (self._array1, self._array2)
-        np_operands = ndarrays(operands)
+        np_operands = ndarrays(self.sources)
         result = op(*np_operands)
         return result
 
@@ -2835,71 +2880,162 @@ class _Elementwise(ComputedArray):
         return result
 
     def masked_array(self):
+        if self._ma_op is None:
+            raise TypeError('No {} operation defined for masked arrays.'
+                            ''.format(self._numpy_op.__name__))
         result = self._calc(self._ma_op)
         return result
 
     def streams_handler(self, masked):
         if masked:
+            if self._ma_op is None:
+                raise TypeError('No {} operation defined for masked arrays.'
+                                ''.format(self._numpy_op.__name__))
             operator = self._ma_op
         else:
             operator = self._numpy_op
         return _ElementwiseStreamsHandler(self.sources, operator)
 
 
-def add(a, b):
+def _unary_fn_wrapper(name, function_to_wrap, masked_equivalent=None,
+                      fn_name=None):
+    @functools.wraps(function_to_wrap, assigned=('__name__', '__doc__'))
+    def wrapped_function(a):
+        return _Elementwise(a, None, function_to_wrap, masked_equivalent)
+    doc_str = ("Return the elementwise evaluation of {}(a) "
+               "as another Array.".format(name))
+    wrapped_function.__name__ = fn_name or function_to_wrap.__name__
+    wrapped_function.__doc__ = doc_str
+    return wrapped_function
+
+
+def _dual_input_fn_wrapper(name, function_to_wrap, masked_equivalent=None,
+                           fn_name=None):
+    @functools.wraps(function_to_wrap, assigned=('__name__', '__doc__'))
+    def wrapped_function(a, b):
+        return _Elementwise(a, b, function_to_wrap,
+                            masked_equivalent)
+    doc_str = ("Return the elementwise evaluation of {}(a, b) "
+               "as another Array.".format(name))
+    wrapped_function.__name__ = fn_name or function_to_wrap.__name__
+    wrapped_function.__doc__ = doc_str
+    return wrapped_function
+
+
+def _ufunc_wrapper(ufunc):
     """
-    Return the elementwise evaluation of `a + b` as another Array.
-
-    """
-    return _Elementwise(a, b, np.add, np.ma.add)
-
-
-def sub(a, b):
-    """
-    Return the elementwise evaluation of `a - b` as another Array.
-
-    """
-    return _Elementwise(a, b, np.subtract, np.ma.subtract)
-
-
-def multiply(a, b):
-    """
-    Return the elementwise evaluation of `a * b` as another Array.
-
-    """
-    return _Elementwise(a, b, np.multiply, np.ma.multiply)
-
-
-def floor_divide(a, b):
-    """
-    Return the elementwise evaluation of `a // b` as another Array.
-
-    """
-    return _Elementwise(a, b, np.floor_divide, np.ma.floor_divide)
-
-
-def divide(a, b):
-    """
-    Return the elementwise evaluation of 'a / b' as another Array.
+    A function to generate the top level biggus ufunc wrappers.
 
     """
-    return _Elementwise(a, b, np.divide, np.ma.divide)
+    if not isinstance(ufunc, np.ufunc):
+        raise TypeError('{} is not a ufunc'.format(ufunc))
+
+    name = ufunc.__name__
+    # Get hold of the masked array equivalent, if it exists.
+    ma_ufunc = getattr(np.ma, name, None)
+    if ufunc.nin == 2 and ufunc.nout == 1:
+        func = _dual_input_fn_wrapper('np.{}'.format(name), ufunc, ma_ufunc,
+                                      name)
+    elif ufunc.nin == 1 and ufunc.nout == 1:
+        func = _unary_fn_wrapper('np.{}'.format(name), ufunc, ma_ufunc,
+                                 name)
+    else:
+        raise ValueError('Unsupported ufunc {!r} with {} input arrays & {} '
+                         'output arrays.'.format(name, ufunc.nin, ufunc.nout))
+    return func
 
 
-def true_divide(a, b):
-    """
-    Return the elementwise evaluation of ``np.true_divide`` as another Array.
+# Single argument math operations.
+negative = _ufunc_wrapper(np.negative)
+absolute = _ufunc_wrapper(np.absolute)
+rint = _ufunc_wrapper(np.rint)
+sign = _ufunc_wrapper(np.sign)
+conj = _ufunc_wrapper(np.conj)
+exp = _ufunc_wrapper(np.exp)
+exp2 = _ufunc_wrapper(np.exp2)
+log = _ufunc_wrapper(np.log)
+log2 = _ufunc_wrapper(np.log2)
+log10 = _ufunc_wrapper(np.log10)
+expm1 = _ufunc_wrapper(np.expm1)
+sqrt = _ufunc_wrapper(np.sqrt)
+square = _ufunc_wrapper(np.square)
+reciprocal = _ufunc_wrapper(np.reciprocal)
 
-    """
-    return _Elementwise(a, b, np.true_divide, np.ma.true_divide)
+
+# Dual argument math operations.
+add = _ufunc_wrapper(np.add)
+sub = _ufunc_wrapper(np.subtract)
+subtract = _ufunc_wrapper(np.subtract)
+multiply = _ufunc_wrapper(np.multiply)
+floor_divide = _ufunc_wrapper(np.floor_divide)
+true_divide = _ufunc_wrapper(np.true_divide)
+divide = _ufunc_wrapper(np.divide)
+power = _ufunc_wrapper(np.power)
 
 
-def power(a, b):
-    """
-    Return the elementwise evaluation of `a ** b` as another Array.
+# Single argument trigonometric functions.
+sin = _ufunc_wrapper(np.sin)
+cos = _ufunc_wrapper(np.cos)
+tan = _ufunc_wrapper(np.tan)
+arcsin = _ufunc_wrapper(np.arcsin)
+arccos = _ufunc_wrapper(np.arccos)
+arctan = _ufunc_wrapper(np.arctan)
+sinh = _ufunc_wrapper(np.sinh)
+cosh = _ufunc_wrapper(np.cosh)
+tanh = _ufunc_wrapper(np.tanh)
+arcsinh = _ufunc_wrapper(np.arcsinh)
+arccosh = _ufunc_wrapper(np.arccosh)
+arctanh = _ufunc_wrapper(np.arctanh)
+deg2rad = _ufunc_wrapper(np.deg2rad)
+rad2deg = _ufunc_wrapper(np.rad2deg)
 
-    """
-    return _Elementwise(a, b, np.power, np.ma.power)
+
+# Dual argument trigonometric functions.
+arctan2 = _ufunc_wrapper(np.arctan2)
+hypot = _ufunc_wrapper(np.hypot)
+
+
+# Bit-twiddling functions.
+bitwise_and = _ufunc_wrapper(np.bitwise_and)
+bitwise_or = _ufunc_wrapper(np.bitwise_or)
+bitwise_xor = _ufunc_wrapper(np.bitwise_xor)
+invert = _ufunc_wrapper(np.invert)
+left_shift = _ufunc_wrapper(np.left_shift)
+right_shift = _ufunc_wrapper(np.right_shift)
+
+
+# Comparison functions.
+greater = _ufunc_wrapper(np.greater)
+greater_equal = _ufunc_wrapper(np.greater_equal)
+less = _ufunc_wrapper(np.less)
+less_equal = _ufunc_wrapper(np.less_equal)
+not_equal = _ufunc_wrapper(np.not_equal)
+equal = _ufunc_wrapper(np.equal)
+logical_and = _ufunc_wrapper(np.logical_and)
+logical_or = _ufunc_wrapper(np.logical_or)
+logical_xor = _ufunc_wrapper(np.logical_xor)
+logical_not = _ufunc_wrapper(np.logical_not)
+maximum = _ufunc_wrapper(np.maximum)
+minimum = _ufunc_wrapper(np.minimum)
+fmax = _ufunc_wrapper(np.fmax)
+fmin = _ufunc_wrapper(np.fmin)
+
+
+# Floating functions.
+isreal = _unary_fn_wrapper('np.isreal', np.isreal)
+iscomplex = _unary_fn_wrapper('np.iscomplex', np.iscomplex)
+isinf = _unary_fn_wrapper('np.isinf', np.isinf)
+isnan = _unary_fn_wrapper('np.isnan', np.isnan)
+signbit = _unary_fn_wrapper('np.signbit', np.signbit)
+copysign = _dual_input_fn_wrapper('np.copysign', np.copysign)
+nextafter = _dual_input_fn_wrapper('np.nextafter', np.nextafter)
+# modf = _unary_fn_wrapper('np.modf', np.modf)  # Needs 2 arrays out.
+ldexp = _dual_input_fn_wrapper('np.ldexp', np.ldexp)
+# frexp = _unary_fn_wrapper('np.frexp', np.frexp)  # Needs 2 arrays out.
+fmod = _dual_input_fn_wrapper('np.fmod', np.fmod)
+floor = _ufunc_wrapper(np.floor)
+ceil = _ufunc_wrapper(np.ceil)
+trunc = _ufunc_wrapper(np.trunc)
 
 
 def _sliced_shape(shape, keys):

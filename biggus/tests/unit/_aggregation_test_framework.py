@@ -63,7 +63,7 @@ class InvalidAxis(Operator):
 
 class AggregationDtype(Operator):
     def _check(self, source):
-        # Default behaviour is for operators which inherrit their dtype from
+        # Default behaviour is for operators which inherit their dtype from
         # the objects they perform the aggregation.
         array = biggus.NumpyArrayAdapter(np.arange(2, dtype=source))
         agg = self.biggus_operator(array, axis=0)
