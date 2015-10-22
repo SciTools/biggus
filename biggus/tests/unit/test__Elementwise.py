@@ -112,5 +112,12 @@ class Test_single_argument_dtype(unittest.TestCase):
         self.assertEqual(actual.ndarray().max(), 4)
 
 
+class Test_single_argument(unittest.TestCase):
+    def test_getitem(self):
+        a1 = np.arange(3)
+        actual = Elementwise(a1, None, np.cos)
+        self.assertEqual(actual[1].ndarray(), np.cos(a1[1]))
+
+
 if __name__ == '__main__':
     unittest.main()

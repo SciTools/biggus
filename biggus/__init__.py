@@ -2883,7 +2883,7 @@ class _Elementwise(ComputedArray):
 
     def _getitem_full_keys(self, keys):
         if self._array2 is None:
-            result = _Elementwise(self._array1[keys],
+            result = _Elementwise(self._array1[keys], None,
                                   self._numpy_op, self._ma_op)
         else:
             result = _Elementwise(self._array1[keys], self._array2[keys],
