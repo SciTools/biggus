@@ -2074,14 +2074,25 @@ def _all_slices_inner(item_size, shape, always_slices=False):
     #   (slice(None)
     nbytes = item_size
     all_slices = []
+    # We walk through the dimensions, starting from the RHS,
+    # and keep track of the total size of one item in the current dimension
+    # in the nbytes variable.
     for i, size in reversed(list(enumerate(shape))):
+        # Check to see if the whole of this dimension can fit into a single
+        # chunk.
         if size * nbytes <= MAX_CHUNK_SIZE:
             slices = (slice(None),)
+        # Otherwise, determine if previous dimensions have already saturated
+        # MAX_CHUNK_SIZE. If so, we need to pick off each item from this
+        # dimension.
         elif nbytes > MAX_CHUNK_SIZE:
             if always_slices:
                 slices = [slice(i, i + 1) for i in range(size)]
             else:
                 slices = range(size)
+        # Otherwise we have found the dimension that reaches the MAX_CHUNK_SIZE
+        # limit, so we apply a range which gives chunk sizes as close to the
+        #  MAX_CHUNK_SIZE as possible. 
         else:
             step = MAX_CHUNK_SIZE // nbytes
             slices = []
