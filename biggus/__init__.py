@@ -199,8 +199,7 @@ class ProducerNode(Node):
             # we have to transpose `all_cuts` and `cut_shape` ourselves.
             # Then we have to invert the transposition once we have
             # indentified the relevant slices.
-            all_cuts = _all_slices_inner(self.array.dtype.itemsize,
-                                         self.array.shape,
+            all_cuts = _all_slices_inner(self.array.shape,
                                          always_slices=True)
             all_cuts = [all_cuts[i] for i in self.iteration_order]
             cut_shape = tuple(len(cuts) for cuts in all_cuts)
@@ -2055,24 +2054,31 @@ def masked_arrays(arrays):
     return engine.masked_arrays(*arrays)
 
 
-#: The maximum number of bytes to allow when processing an array in
-#: "bite-size" chunks. The value has been empirically determined to
+#: The maximum number of bytes per chunk to allow when processing an array in
+#: "bite-size" chunks. Chunks are determined by the _all_slices function, where
+#: an assumption is made that data type nbytes is 8.
+#: The value has been empirically determined to
 #: provide vaguely near optimal performance under certain conditions.
-MAX_CHUNK_SIZE = 8 * 1024 * 1024
+MAX_CHUNK_SIZE = 8 * 1024 * 1024 * 2
 
 
 def _all_slices(array):
-    return _all_slices_inner(array.dtype.itemsize, array.shape)
+    return _all_slices_inner(array.shape)
 
 
-def _all_slices_inner(item_size, shape, always_slices=False):
+def _all_slices_inner(shape, always_slices=False):
     # Return the slices for each dimension which ensure complete
     # coverage by chunks no larger than MAX_CHUNK_SIZE.
     # e.g. For a float32 array of shape (100, 768, 1024) the slices are:
     #   (0, 1, 2, ..., 99),
     #   (slice(0, 256), slice(256, 512), slice(512, 768)),
     #   (slice(None)
-    nbytes = item_size
+
+    # Fix the item size to 8 bytes, as this is part of the definition of
+    # MAX_CHUNK_SIZE. nbytes will be updated as we traverse the dimensions of
+    # shape so that it equals the number of bytes that one item in the current
+    # dimension represents.
+    nbytes = 8
     all_slices = []
     # We walk through the dimensions, starting from the RHS,
     # and keep track of the total size of one item in the current dimension
@@ -2092,7 +2098,7 @@ def _all_slices_inner(item_size, shape, always_slices=False):
                 slices = range(size)
         # Otherwise we have found the dimension that reaches the MAX_CHUNK_SIZE
         # limit, so we apply a range which gives chunk sizes as close to the
-        #  MAX_CHUNK_SIZE as possible. 
+        # MAX_CHUNK_SIZE as possible. 
         else:
             step = MAX_CHUNK_SIZE // nbytes
             slices = []

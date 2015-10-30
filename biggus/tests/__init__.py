@@ -1,9 +1,30 @@
-import numpy as np
+# (C) British Crown Copyright 2014 - 2015, Met Office
+#
+# This file is part of Biggus.
+#
+# Biggus is free software: you can redistribute it and/or modify it under
+# the terms of the GNU Lesser General Public License as published by the
+# Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# Biggus is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU Lesser General Public License for more details.
+#
+# You should have received a copy of the GNU Lesser General Public License
+# along with Biggus. If not, see <http://www.gnu.org/licenses/>.
+
+from contextlib import contextmanager
 
 try:
     from unittest import mock
 except ImportError:
     import mock
+
+import numpy as np
+
+import biggus
 
 
 class AccessCounter(object):
@@ -46,3 +67,11 @@ class _KeyGen(object):
 
 #: An object that can be indexed to return a usable key.
 key_gen = _KeyGen()
+
+
+@contextmanager
+def set_chunk_size(value):
+    old_chunk_size = biggus.MAX_CHUNK_SIZE
+    biggus.MAX_CHUNK_SIZE = value
+    yield
+    biggus.MAX_CHUNK_SIZE = old_chunk_size

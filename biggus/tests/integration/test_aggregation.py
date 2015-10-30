@@ -1,4 +1,4 @@
-# (C) British Crown Copyright 2014, Met Office
+# (C) British Crown Copyright 2014 - 2015, Met Office
 #
 # This file is part of Biggus.
 #
@@ -21,6 +21,7 @@ import unittest
 import numpy as np
 
 import biggus
+from biggus.tests import set_chunk_size
 
 
 class Test(unittest.TestCase):
@@ -32,6 +33,17 @@ class Test(unittest.TestCase):
         self.assertEqual(result.shape, (10, 720))
         self.assertTrue(np.all(result == 0))
         self.assertTrue(np.all(result.mask == 0))
+
+
+class TestAggregation__large_array_mixed_dtypes(unittest.TestCase):
+    def test(self):
+        shape = (3, 5, 10)
+        a = biggus.ConstantArray(shape, dtype=np.float32)
+        b = biggus.ConstantArray(shape, dtype=np.float64)
+
+        with set_chunk_size(32/8*10-1):
+            result = biggus.sum(a * b, axis=0).ndarray()
+            self.assertEqual(result.shape, shape[1:])
 
 
 if __name__ == '__main__':

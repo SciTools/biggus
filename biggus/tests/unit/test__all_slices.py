@@ -1,4 +1,4 @@
-# (C) British Crown Copyright 2014, Met Office
+# (C) British Crown Copyright 2014 - 2015, Met Office
 #
 # This file is part of Biggus.
 #
@@ -16,30 +16,23 @@
 # along with Biggus. If not, see <http://www.gnu.org/licenses/>.
 """Unit tests for `biggus._all_slices`."""
 
-from contextlib import contextmanager
 import unittest
 
 import numpy as np
 
 import biggus
 from biggus import _all_slices, _all_slices_inner
-from biggus.tests import mock
+from biggus.tests import set_chunk_size
 
 
 class Test__all_slices(unittest.TestCase):
-    @contextmanager
-    def set_chunk_size(self, value):
-        old_chunk_size = biggus.MAX_CHUNK_SIZE
-        biggus.MAX_CHUNK_SIZE = value
-        yield
-        biggus.MAX_CHUNK_SIZE = old_chunk_size
 
     def test_all_cases(self):
         array = biggus.ConstantArray((4, 3, 5), dtype=np.float32)
         # Chunk size set to fit in two items from the second dimension into a
         # single chunk, but not the whole dimension.
-        chunk_size = (32 / 8) * 5 * 3 - 1
-        with self.set_chunk_size(chunk_size):
+        chunk_size = 8 * 5 * 3 - 1
+        with set_chunk_size(chunk_size):
             slices = _all_slices(array)
         expected = [[0, 1, 2, 3],
                     [slice(0, 2, None), slice(2, 3, None)],
@@ -48,10 +41,9 @@ class Test__all_slices(unittest.TestCase):
 
     def test_always_slices(self):
         array = biggus.ConstantArray((3, 5), dtype=np.float32)
-        chunk_size = (32 / 8) * 5 - 1
-        with self.set_chunk_size(chunk_size):
-            slices = _all_slices_inner(array.dtype.itemsize, array.shape,
-                                       always_slices=True)
+        chunk_size = 8 * 5 - 1
+        with set_chunk_size(chunk_size):
+            slices = _all_slices_inner(array.shape, always_slices=True)
         expected = [[slice(0, 1, None), slice(1, 2, None), slice(2, 3, None)],
                     [slice(0, 4, None), slice(4, 5, None)]]
         self.assertEqual(slices, expected)
