@@ -31,7 +31,7 @@ class Test__all_slices(unittest.TestCase):
         array = biggus.ConstantArray((4, 3, 5), dtype=np.float32)
         # Chunk size set to fit in two items from the second dimension into a
         # single chunk, but not the whole dimension.
-        chunk_size = 8 * 5 * 3 - 1
+        chunk_size = 5 * 3 - 1
         with set_chunk_size(chunk_size):
             slices = _all_slices(array)
         expected = [[0, 1, 2, 3],
@@ -41,7 +41,7 @@ class Test__all_slices(unittest.TestCase):
 
     def test_always_slices(self):
         array = biggus.ConstantArray((3, 5), dtype=np.float32)
-        chunk_size = 8 * 5 - 1
+        chunk_size = 5 - 1
         with set_chunk_size(chunk_size):
             slices = _all_slices_inner(array.shape, always_slices=True)
         expected = [[slice(0, 1, None), slice(1, 2, None), slice(2, 3, None)],

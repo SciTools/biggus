@@ -2074,24 +2074,23 @@ def _all_slices_inner(shape, always_slices=False):
     #   (slice(0, 256), slice(256, 512), slice(512, 768)),
     #   (slice(None)
 
-    # Fix the item size to 8 bytes, as this is part of the definition of
-    # MAX_CHUNK_SIZE. nbytes will be updated as we traverse the dimensions of
-    # shape so that it equals the number of bytes that one item in the current
-    # dimension represents.
-    nbytes = 8
+    # Fix the item size to a single element. `n_elems` will be updated as we
+    # traverse the dimensions of shape so that it equals the number of bytes
+    # that one item in the current dimension represents.
+    n_elems = 1
     all_slices = []
     # We walk through the dimensions, starting from the RHS,
     # and keep track of the total size of one item in the current dimension
-    # in the nbytes variable.
+    # in the n_elems variable.
     for i, size in reversed(list(enumerate(shape))):
         # Check to see if the whole of this dimension can fit into a single
         # chunk.
-        if size * nbytes <= MAX_CHUNK_SIZE:
+        if size * n_elems <= MAX_CHUNK_SIZE:
             slices = (slice(None),)
         # Otherwise, determine if previous dimensions have already saturated
         # MAX_CHUNK_SIZE. If so, we need to pick off each item from this
         # dimension.
-        elif nbytes > MAX_CHUNK_SIZE:
+        elif n_elems > MAX_CHUNK_SIZE:
             if always_slices:
                 slices = [slice(i, i + 1) for i in range(size)]
             else:
@@ -2100,11 +2099,11 @@ def _all_slices_inner(shape, always_slices=False):
         # limit, so we apply a range which gives chunk sizes as close to the
         # MAX_CHUNK_SIZE as possible. 
         else:
-            step = MAX_CHUNK_SIZE // nbytes
+            step = MAX_CHUNK_SIZE // n_elems
             slices = []
             for start in range(0, size, step):
                 slices.append(slice(start, np.min([start + step, size])))
-        nbytes *= size
+        n_elems *= size
         all_slices.insert(0, slices)
     return all_slices
 
