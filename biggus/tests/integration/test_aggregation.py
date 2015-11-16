@@ -41,7 +41,7 @@ class TestAggregation__mixed_dtypes(unittest.TestCase):
         a = biggus.ConstantArray(shape, dtype=np.float32)
         b = biggus.ConstantArray(shape, dtype=np.float64)
 
-        with set_chunk_size(32/8*10-1):
+        with set_chunk_size(32//8*10-1):
             result = biggus.sum(a * b, axis=0).ndarray()
             self.assertEqual(result.shape, shape[1:])
 
@@ -68,7 +68,7 @@ class Test__slices_with_mathematical_filter(unittest.TestCase):
         # Build filter matrix as a numpy array and then populate.
         filter_matrix_np = np.zeros((shape[0], shape[0])).astype(self.dtype)
 
-        for offset, value in weights.iteritems():
+        for offset, value in weights.items():
             filter_matrix_np += np.diag([value] * (shape[0] - offset),
                                         k=offset)
             if offset > 0:
