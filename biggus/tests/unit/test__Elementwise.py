@@ -29,17 +29,24 @@ from biggus import _Elementwise as Elementwise
 
 class Test__masked_arrays(unittest.TestCase):
     def setUp(self):
-        a = np.arange(6).reshape(3, 2)
+        a = np.arange(6).reshape(3, 2) - 3
         self.mask = a % 3 == 0
         self.masked_array = np.ma.masked_array(a, self.mask)
 
     def test_single_argument_operation(self):
+        expected = np.abs(self.masked_array)
         actual = Elementwise(self.masked_array, None, np.abs, ma.abs)
-        assert_array_equal(actual.masked_array().mask, self.mask)
+        result = actual.masked_array()
+        assert_array_equal(result.mask, self.mask)
+        assert_array_equal(result, expected)
 
     def test_dual_argument_operation(self):
-        actual = Elementwise(self.masked_array, 2, np.power, ma.power)
-        assert_array_equal(actual.masked_array().mask, self.mask)
+        exponent = 2
+        expected = self.masked_array ** exponent
+        actual = Elementwise(self.masked_array, exponent, np.power, ma.power)
+        result = actual.masked_array()
+        assert_array_equal(result.mask, self.mask)
+        assert_array_equal(result, expected)
 
     def test_no_masked_array_function(self):
         result = Elementwise(self.masked_array, None, np.sign)
