@@ -2043,6 +2043,18 @@ def ndarrays(arrays):
     return engine.ndarrays(*arrays)
 
 
+def masked_arrays(arrays):
+    """
+    Return a list of NumPy masked array objects corresponding to the given
+    biggus Array objects.
+
+    This can be more efficient (and hence faster) than converting the
+    individual arrays one by one.
+
+    """
+    return engine.masked_arrays(*arrays)
+
+
 #: The maximum number of bytes to allow when processing an array in
 #: "bite-size" chunks. The value has been empirically determined to
 #: provide vaguely near optimal performance under certain conditions.
@@ -2890,20 +2902,17 @@ class _Elementwise(ComputedArray):
                                   self._numpy_op, self._ma_op)
         return result
 
-    def _calc(self, op):
-        np_operands = ndarrays(self.sources)
-        result = op(*np_operands)
-        return result
-
     def ndarray(self):
-        result = self._calc(self._numpy_op)
+        np_operands = ndarrays(self.sources)
+        result = self._numpy_op(*np_operands)
         return result
 
     def masked_array(self):
         if self._ma_op is None:
             raise TypeError('No {} operation defined for masked arrays.'
                             ''.format(self._numpy_op.__name__))
-        result = self._calc(self._ma_op)
+        ma_operands = masked_arrays(self.sources)
+        result = self._ma_op(*ma_operands)
         return result
 
     def streams_handler(self, masked):

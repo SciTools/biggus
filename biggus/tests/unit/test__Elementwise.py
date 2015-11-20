@@ -27,9 +27,22 @@ from numpy.testing import assert_array_equal
 from biggus import _Elementwise as Elementwise
 
 
-class Test_no_masked_array_function(unittest.TestCase):
-    def test(self):
-        result = Elementwise(np.arange(3), None, np.sign)
+class Test__masked_arrays(unittest.TestCase):
+    def setUp(self):
+        a = np.arange(6).reshape(3, 2)
+        self.mask = a % 3 == 0
+        self.masked_array = np.ma.masked_array(a, self.mask)
+
+    def test_single_argument_operation(self):
+        actual = Elementwise(self.masked_array, None, np.abs, ma.abs)
+        assert_array_equal(actual.masked_array().mask, self.mask)
+
+    def test_dual_argument_operation(self):
+        actual = Elementwise(self.masked_array, 2, np.power, ma.power)
+        assert_array_equal(actual.masked_array().mask, self.mask)
+
+    def test_no_masked_array_function(self):
+        result = Elementwise(self.masked_array, None, np.sign)
         msg = 'No sign operation defined for masked arrays'
         with self.assertRaisesRegexp(TypeError, msg):
             result.masked_array()
