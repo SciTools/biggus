@@ -2097,7 +2097,7 @@ def _all_slices_inner(shape, always_slices=False):
                 slices = range(size)
         # Otherwise we have found the dimension that reaches the MAX_CHUNK_SIZE
         # limit, so we apply a range which gives chunk sizes as close to the
-        # MAX_CHUNK_SIZE as possible. 
+        # MAX_CHUNK_SIZE as possible.
         else:
             step = MAX_CHUNK_SIZE // n_elems
             slices = []
