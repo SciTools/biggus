@@ -2873,6 +2873,9 @@ class _Elementwise(ComputedArray):
                 # Trigger an exception (TypeError).
                 numpy_op(np.array([1], dtype=array1.dtype))
 
+            # Keep initial_array2 for later type checking.
+            initial_array2 = array2
+
             # Dual input elementwise
             array2 = ensure_array(array2)
 
@@ -2880,12 +2883,21 @@ class _Elementwise(ComputedArray):
             # TypeError will be raised if not broadcastable.
             array1, array2 = BroadcastArray.broadcast_arrays(array1, array2)
 
+            # Explicitly check the type, using is, not isinstance;
+            # this is to trap the case where a Python int of float is provided,
+            # rather than a numpy int or float.  The type promotion is handled
+            # differently, for consistency with numpy (1.8 & 1.9) behaviour.
+            if type(initial_array2) is int or type(initial_array2) is float:
+                second_array = initial_array2
+            else:
+                second_array = np.ones(1, dtype=array2.dtype)
+
             # Type-promotion - The resultant dtype depends on both the array
             # dtypes and the operation. Avoid using np.find_common_dtype(),
             # here, as integer division yields a float, whereas standard type
             # coercion rules with find_common_dtype yields an integer.
             dtype = numpy_op(np.ones(1, dtype=array1.dtype),
-                             np.ones(1, dtype=array2.dtype)).dtype
+                             second_array).dtype
 
         self._dtype = dtype
         self._array1 = array1
