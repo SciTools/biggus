@@ -181,22 +181,47 @@ class Test___getitem__(unittest.TestCase):
 class Test__deepcopy__(unittest.TestCase):
     # Numpy <= 1.10 has a bug which prevents a deepcopy of an F-order
     # object array.
-    # See https://github.com/SciTools/biggus/issues/157.
+    # See https://github.com/SciTools/biggus/issues/157 and
+    # https://github.com/numpy/numpy/pull/6456.
+    @staticmethod
+    def adapt(value):
+        return NumpyArrayAdapter(np.array(value))
+
+    def check(self, order):
+        adapt = self.adapt
+        expected = np.array([[0, 1], [2, 3]], order=order)
+        orig = ArrayStack(np.array([[adapt(0), adapt(1)],
+                                    [adapt(2), adapt(3)]],
+                                   order=order, dtype=object))
+        copied = copy.deepcopy(orig)
+        assert_array_equal(expected, copied.ndarray())
+
     def test_fortran_order(self):
         self.check('f')
 
     def test_c_order(self):
         self.check('c')
 
-    def check(self, order):
-        def adapt(value):
-            return NumpyArrayAdapter(np.array(value))
-
-        expected = np.array([[0, 1], [2, 3]], order=order)
-        orig = ArrayStack(np.array([[adapt(0), adapt(1)],
-                                    [adapt(2), adapt(3)]],
-                                   order=order, dtype=object))
-        copied = copy.deepcopy(orig)
+    def test_slice_copy(self):
+        adapt = self.adapt
+        shape = (2, 22, 2)
+        data = [adapt(v) for v in range(np.cumprod(shape)[-1])]
+        base = ArrayStack(np.array(data, dtype='O').reshape(shape))
+        s = (slice(None), (3, 7, 11, 15, 18, 21), slice(None))
+        actual = base[s]
+        copied = copy.deepcopy(actual)
+        expected = np.array([[[6, 7],
+                              [14, 15],
+                              [22, 23],
+                              [30, 31],
+                              [36, 37],
+                              [42, 43]],
+                             [[50, 51],
+                              [58, 59],
+                              [66, 67],
+                              [74, 75],
+                              [80, 81],
+                              [86, 87]]], dtype='O')
         assert_array_equal(expected, copied.ndarray())
 
 
