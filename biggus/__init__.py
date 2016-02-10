@@ -1721,18 +1721,21 @@ class ArrayStack(Array):
     def __deepcopy__(self, memo):
         # We override deepcopy here as a result of
         # https://github.com/SciTools/biggus/issues/157.
+        # This override is a temporary patch for the
+        # defect in NumPy which is addressed by
+        # https://github.com/numpy/numpy/pull/6456
         from copy import deepcopy
 
-        if np.isfortran(self._stack):
-            from functools import partial
+        # Preserve the array ordering by performing an
+        # element-wise deepcopy of the stack payload.
+        deepcopy_with_memo = functools.partial(deepcopy, memo=memo)
+        deepcopy_elementwise = np.vectorize(deepcopy_with_memo,
+                                            otypes=[np.object])
+        result = deepcopy_elementwise(self._stack)
+        memo[id(self._stack)] = result
 
-            deepcopy_with_memo = partial(deepcopy, memo=memo)
-            deepcopy_elementwise = np.vectorize(deepcopy_with_memo,
-                                                otypes=[np.object])
-            result = deepcopy_elementwise(self._stack)
-            memo[id(self._stack)] = result
-
-        # Implement a standard deepcopy. We've dealt with any issues already.
+        # Implement a standard deepcopy now we've already dealt
+        # with any array ordering issues.
         cls = self.__class__
         self_copied = cls.__new__(cls)
         self_copied.__dict__.update(deepcopy(self.__dict__, memo))
