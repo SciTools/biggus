@@ -49,6 +49,19 @@ class TestChaining(unittest.TestCase):
         result = mean2.ndarray()
         np.testing.assert_array_equal(result, expected)
 
+    def test_masked_array_numpy_first_biggus_second(self):
+        # Ensure that an operation where the biggus array is second (i.e.
+        # calling the special method of the numpy array not the biggus array,
+        # returns the expected type).
+        mask = [False, True, False]
+        arr = np.ma.array([1, 2, 3], mask=mask)
+        barr = biggus.NumpyArrayAdapter(arr)
+        result = (np.array([[1.]]) * barr).masked_array()
+        target = np.array([[1.]]) * arr
+
+        np.testing.assert_array_equal(result, target)
+        np.testing.assert_array_equal(result.mask, target.mask)
+
 
 if __name__ == '__main__':
     unittest.main()
