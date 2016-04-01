@@ -2394,8 +2394,8 @@ class _StdStreamsHandler(_AggregationStreamsHandler):
 
     def bootstrap(self, processed_chunk_shape):
         self.k = 1
-        dtype = (np.zeros(1, dtype=self.array.dtype) / 1.).dtype
-        self.q = np.zeros(processed_chunk_shape, dtype=dtype)
+        self._dtype = (np.zeros(1, dtype=self.array.dtype) / 1.).dtype
+        self.q = np.zeros(processed_chunk_shape, dtype=self._dtype)
 
     def finalise(self):
         self.q /= (self.k - self.ddof)
@@ -2407,10 +2407,10 @@ class _StdStreamsHandler(_AggregationStreamsHandler):
         return chunk
 
     def process_data(self, data):
-        data = np.rollaxis(data, self.axis)
+        data = np.rollaxis(data, self.axis).astype(self._dtype)
 
         if self.k == 1:
-            self.a = data[0].copy()
+            self.a = data[0]
             data = data[1:]
 
         for data_slice in data:
