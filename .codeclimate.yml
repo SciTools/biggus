@@ -1,0 +1,21 @@
+engines:
+    duplication:
+        enabled: true
+        config:
+            languages:
+                - python
+    fixme:
+        enabled: true
+    pep8:
+        enabled: true
+    radon:
+        enabled: true
+        config:
+            python_version: 2
+ratings:
+    paths:
+        - "biggus/__init__.py"
+        - "setup.py"
+exclude_paths:
+    - "biggus/tests/**/*"
+    - "doc/**/*"
