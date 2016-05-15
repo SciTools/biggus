@@ -1,4 +1,4 @@
-# (C) British Crown Copyright 2014, Met Office
+# (C) British Crown Copyright 2014 - 2016, Met Office
 #
 # This file is part of Biggus.
 #
@@ -21,7 +21,7 @@ import numpy.ma as ma
 import unittest
 
 import biggus
-import biggus.tests.unit._aggregation_test_framework as test_framework
+import biggus.tests.unit.init._aggregation_test_framework as test_framework
 
 
 class Operator(object):

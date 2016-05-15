@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with Biggus. If not, see <http://www.gnu.org/licenses/>.
 """
-Unit tests for `biggus._unary_fn_wrapper` and the functions that it
+Unit tests for `biggus._init._unary_fn_wrapper` and the functions that it
 has wrapped.
 
 """
@@ -28,6 +28,7 @@ import numpy as np
 from numpy.testing import assert_array_equal
 
 import biggus
+from biggus._init import _unary_fn_wrapper, _Elementwise
 
 
 class Test__unary_fn_wrapper(unittest.TestCase):
@@ -36,8 +37,7 @@ class Test__unary_fn_wrapper(unittest.TestCase):
         assertRaisesRegex = unittest.TestCase.assertRaisesRegexp
 
     def test_docstring(self):
-        wrapped_fn = biggus._unary_fn_wrapper('my_module.my_function',
-                                              lambda a: a)
+        wrapped_fn = _unary_fn_wrapper('my_module.my_function', lambda a: a)
         doc = inspect.getdoc(wrapped_fn)
 
         expected = ('Return the elementwise evaluation of '
@@ -45,26 +45,23 @@ class Test__unary_fn_wrapper(unittest.TestCase):
         self.assertEqual(doc, expected)
 
     def test_auto_fn_name(self):
-        wrapped_fn = biggus._unary_fn_wrapper('my_module.my_function',
-                                              lambda a: a)
+        wrapped_fn = _unary_fn_wrapper('my_module.my_function', lambda a: a)
         self.assertEqual(wrapped_fn.__name__, (lambda a: a).__name__)
 
     def test_given_fn_name(self):
-        wrapped_fn = biggus._unary_fn_wrapper('my_module.my_function',
-                                              lambda a: a, fn_name='identity')
+        wrapped_fn = _unary_fn_wrapper('my_module.my_function', lambda a: a,
+                                       fn_name='identity')
         self.assertEqual(wrapped_fn.__name__, 'identity')
 
     def test_masked_array_creates_elementwise(self):
-        wrapped_fn = biggus._unary_fn_wrapper('my_module.my_function',
-                                              lambda a: a + 10,
-                                              lambda a: a - 10,
-                                              fn_name='identity')
-        self.assertIsInstance(wrapped_fn(np.array([1])), biggus._Elementwise)
+        wrapped_fn = _unary_fn_wrapper('my_module.my_function',
+                                       lambda a: a + 10, lambda a: a - 10,
+                                       fn_name='identity')
+        self.assertIsInstance(wrapped_fn(np.array([1])), _Elementwise)
 
     def test_unexpected_n_arguments(self):
-        wrapped_fn = biggus._unary_fn_wrapper('my_module.my_function',
-                                              lambda a: a + 10,
-                                              fn_name='identity')
+        wrapped_fn = _unary_fn_wrapper('my_module.my_function',
+                                       lambda a: a + 10, fn_name='identity')
         # TODO: It would be good if this were not called "wrapped_function".
         if sys.version_info[0] == 2:
             msg = 'wrapped_function\(\) takes exactly 1 argument \(2 given\)'
@@ -75,24 +72,21 @@ class Test__unary_fn_wrapper(unittest.TestCase):
             wrapped_fn(np.array([-5, 2]), np.array([-5, 2]))
 
     def test_ndarray_expected_values(self):
-        wrapped_fn = biggus._unary_fn_wrapper('my_module.my_function',
-                                              lambda a: a + 10,
-                                              fn_name='identity')
+        wrapped_fn = _unary_fn_wrapper('my_module.my_function',
+                                       lambda a: a + 10, fn_name='identity')
         assert_array_equal(wrapped_fn(np.array([-5, 2])).ndarray(),
                            [5, 12])
 
     def test_masked_array_expected_values(self):
-        wrapped_fn = biggus._unary_fn_wrapper('my_module.my_function',
-                                              lambda a: a + 10,
-                                              lambda a: a - 10,
-                                              fn_name='identity')
+        wrapped_fn = _unary_fn_wrapper('my_module.my_function',
+                                       lambda a: a + 10, lambda a: a - 10,
+                                       fn_name='identity')
         assert_array_equal(wrapped_fn(np.array([-5, 2])).masked_array(),
                            [-15, -8])
 
     def test_masked_array_undefined(self):
-        wrapped_fn = biggus._unary_fn_wrapper('my_module.my_function',
-                                              lambda a: a + 10,
-                                              fn_name='identity')
+        wrapped_fn = _unary_fn_wrapper('my_module.my_function',
+                                       lambda a: a + 10, fn_name='identity')
         msg = 'No <lambda> operation defined for masked arrays.'
         with self.assertRaisesRegex(TypeError, msg):
             assert_array_equal(wrapped_fn(np.array([-5, 2])).masked_array(),

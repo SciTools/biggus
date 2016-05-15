@@ -1,4 +1,4 @@
-# (C) British Crown Copyright 2015 - 2016, Met Office
+# (C) British Crown Copyright 2016, Met Office
 #
 # This file is part of Biggus.
 #
@@ -14,28 +14,4 @@
 #
 # You should have received a copy of the GNU Lesser General Public License
 # along with Biggus. If not, see <http://www.gnu.org/licenses/>.
-"""Integration tests for maths operations."""
-
-import numpy as np
-import numpy.ma as ma
-import unittest
-
-import biggus
-import biggus.tests.unit.init._aggregation_test_framework as test_framework
-
-
-class TestSum(unittest.TestCase):
-
-    def test_sum_float(self):
-        a = biggus.ConstantArray((1), dtype=np.float32)
-        b = a + 1
-        self.assertEqual('float32', b.dtype)
-
-    def test_sum_int(self):
-        a = biggus.ConstantArray((1), dtype=np.int32)
-        b = a + 1
-        self.assertEqual('int32', b.dtype)
-
-
-if __name__ == '__main__':
-    unittest.main()
+"""Unit tests for `biggus._init`"""

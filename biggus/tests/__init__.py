@@ -24,7 +24,7 @@ except ImportError:
 
 import numpy as np
 
-import biggus
+import biggus._init
 
 
 class AccessCounter(object):
@@ -71,7 +71,7 @@ key_gen = _KeyGen()
 
 @contextmanager
 def set_chunk_size(value):
-    old_chunk_size = biggus.MAX_CHUNK_SIZE
-    biggus.MAX_CHUNK_SIZE = value
+    old_chunk_size = biggus._init.MAX_CHUNK_SIZE
+    biggus._init.MAX_CHUNK_SIZE = value
     yield
-    biggus.MAX_CHUNK_SIZE = old_chunk_size
+    biggus._init.MAX_CHUNK_SIZE = old_chunk_size

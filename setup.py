@@ -37,7 +37,7 @@ setup(
     author='Richard Hattersley',
     author_email='rhattersley@gmail.com',
     packages=['biggus', 'biggus.tests', 'biggus.tests.integration',
-              'biggus.tests.unit'],
+              'biggus.tests.unit', 'biggus.tests.unit.init'],
     classifiers=['License :: OSI Approved :: '
                  'GNU Lesser General Public License v3 (LGPLv3)',
                  'Programming Language :: Python :: 2',

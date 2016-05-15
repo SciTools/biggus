@@ -1,4 +1,4 @@
-# (C) British Crown Copyright 2014, Met Office
+# (C) British Crown Copyright 2014 - 2016, Met Office
 #
 # This file is part of Biggus.
 #
@@ -14,11 +14,11 @@
 #
 # You should have received a copy of the GNU Lesser General Public License
 # along with Biggus. If not, see <http://www.gnu.org/licenses/>.
-"""Unit tests for `biggus._ArrayAdapter`."""
+"""Unit tests for `biggus._init._ArrayAdapter`."""
 
 import unittest
 
-from biggus import _ArrayAdapter
+from biggus._init import _ArrayAdapter
 
 
 class Test___init__(unittest.TestCase):

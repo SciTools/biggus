@@ -29,6 +29,8 @@ import warnings
 import numpy as np
 import numpy.ma as ma
 
+import biggus
+
 
 __all__ = []
 
@@ -328,6 +330,7 @@ class NdarrayNode(ConsumerNode):
             self.result[...] = chunk.data
 
 
+@export
 class AllThreadedEngine(Engine):
     """
     Evaluates lazy expressions by creating a thread for each node in the
@@ -437,15 +440,6 @@ class AllThreadedEngine(Engine):
 
     def ndarrays(self, *arrays):
         return self._evaluate(arrays, False)
-
-
-engine = AllThreadedEngine()
-"""
-The current lazy evaluation engine.
-
-Defaults to an instance of :class:`AllThreadedEngine`.
-
-"""
 
 
 @export
@@ -2023,7 +2017,7 @@ def ndarrays(arrays):
     individual arrays one by one.
 
     """
-    return engine.ndarrays(*arrays)
+    return biggus.engine.ndarrays(*arrays)
 
 
 @export
@@ -2036,7 +2030,7 @@ def masked_arrays(arrays):
     individual arrays one by one.
 
     """
-    return engine.masked_arrays(*arrays)
+    return biggus.engine.masked_arrays(*arrays)
 
 
 #: The maximum number of bytes per chunk to allow when processing an array in
@@ -2558,11 +2552,11 @@ class _Aggregation(ComputedArray):
                             self._kwargs)
 
     def ndarray(self):
-        result, = engine.ndarrays(self)
+        result, = biggus.engine.ndarrays(self)
         return result
 
     def masked_array(self):
-        result, = engine.masked_arrays(self)
+        result, = biggus.engine.masked_arrays(self)
         return result
 
     def streams_handler(self, masked):
@@ -2984,20 +2978,19 @@ def _ufunc_wrapper(ufunc, name=None):
     if not isinstance(ufunc, np.ufunc):
         raise TypeError('{} is not a ufunc'.format(ufunc))
 
-    if name is None:
-        name = ufunc.__name__
-    __all__.append(name)
+    ufunc_name = ufunc.__name__
     # Get hold of the masked array equivalent, if it exists.
-    ma_ufunc = getattr(np.ma, name, None)
+    ma_ufunc = getattr(np.ma, ufunc_name, None)
     if ufunc.nin == 2 and ufunc.nout == 1:
-        func = _dual_input_fn_wrapper('np.{}'.format(name), ufunc, ma_ufunc,
-                                      name)
+        func = _dual_input_fn_wrapper('np.{}'.format(ufunc_name), ufunc,
+                                      ma_ufunc, name)
     elif ufunc.nin == 1 and ufunc.nout == 1:
-        func = _unary_fn_wrapper('np.{}'.format(name), ufunc, ma_ufunc,
+        func = _unary_fn_wrapper('np.{}'.format(ufunc_name), ufunc, ma_ufunc,
                                  name)
     else:
         raise ValueError('Unsupported ufunc {!r} with {} input arrays & {} '
-                         'output arrays.'.format(name, ufunc.nin, ufunc.nout))
+                         'output arrays.'.format(ufunc_name, ufunc.nin,
+                                                 ufunc.nout))
     return func
 
 
@@ -3020,12 +3013,12 @@ reciprocal = _ufunc_wrapper(np.reciprocal)
 
 # Dual argument math operations.
 add = _ufunc_wrapper(np.add)
-sub = _ufunc_wrapper(np.subtract)
+sub = _ufunc_wrapper(np.subtract, 'sub')
 subtract = _ufunc_wrapper(np.subtract)
 multiply = _ufunc_wrapper(np.multiply)
 floor_divide = _ufunc_wrapper(np.floor_divide)
 true_divide = _ufunc_wrapper(np.true_divide)
-divide = _ufunc_wrapper(np.divide)
+divide = _ufunc_wrapper(np.divide, 'divide')
 power = _ufunc_wrapper(np.power)
 
 

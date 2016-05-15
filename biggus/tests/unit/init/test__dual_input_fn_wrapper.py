@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with Biggus. If not, see <http://www.gnu.org/licenses/>.
 """
-Unit tests for `biggus._dual_input_fn_wrapper` and the functions that it
+Unit tests for `_dual_input_fn_wrapper` and the functions that it
 has wrapped.
 
 """
@@ -27,12 +27,13 @@ import numpy as np
 from numpy.testing import assert_array_equal
 
 import biggus
+from biggus._init import _dual_input_fn_wrapper, _Elementwise
 
 
 class Test__dual_input_fn_wrapper(unittest.TestCase):
     def test_docstring(self):
-        wrapped_fn = biggus._dual_input_fn_wrapper('my_module.my_function',
-                                                   lambda a, b: a + b)
+        wrapped_fn = _dual_input_fn_wrapper('my_module.my_function',
+                                            lambda a, b: a + b)
         doc = inspect.getdoc(wrapped_fn)
 
         expected = ('Return the elementwise evaluation of '
@@ -40,43 +41,43 @@ class Test__dual_input_fn_wrapper(unittest.TestCase):
         self.assertEqual(doc, expected)
 
     def test_auto_fn_name(self):
-        wrapped_fn = biggus._dual_input_fn_wrapper('my_module.my_function',
-                                                   lambda a, b: a + b)
+        wrapped_fn = _dual_input_fn_wrapper('my_module.my_function',
+                                            lambda a, b: a + b)
         self.assertEqual(wrapped_fn.__name__, (lambda a, b: a + b).__name__)
 
     def test_given_fn_name(self):
-        wrapped_fn = biggus._dual_input_fn_wrapper('my_module.my_function',
-                                                   lambda a, b: a + b,
-                                                   fn_name='identity')
+        wrapped_fn = _dual_input_fn_wrapper('my_module.my_function',
+                                            lambda a, b: a + b,
+                                            fn_name='identity')
         self.assertEqual(wrapped_fn.__name__, 'identity')
 
     def test_masked_array_creates_elementwise(self):
-        wrapped_fn = biggus._dual_input_fn_wrapper('my_module.my_function',
-                                                   lambda a, b: a + b,
-                                                   lambda a, b: a - b,
-                                                   fn_name='identity')
+        wrapped_fn = _dual_input_fn_wrapper('my_module.my_function',
+                                            lambda a, b: a + b,
+                                            lambda a, b: a - b,
+                                            fn_name='identity')
         result = wrapped_fn(np.array([-5, 2]), np.array([-5, 2]))
-        self.assertIsInstance(result, biggus._Elementwise)
+        self.assertIsInstance(result, _Elementwise)
 
     def test_ndarray_expected_values(self):
-        wrapped_fn = biggus._dual_input_fn_wrapper('my_module.my_function',
-                                                   lambda a, b: a + b,
-                                                   fn_name='identity')
+        wrapped_fn = _dual_input_fn_wrapper('my_module.my_function',
+                                            lambda a, b: a + b,
+                                            fn_name='identity')
         result = wrapped_fn(np.array([-5, 2]), np.array([-5, 2]))
         assert_array_equal(result.ndarray(), [-10, 4])
 
     def test_masked_array_expected_values(self):
-        wrapped_fn = biggus._dual_input_fn_wrapper('my_module.my_function',
-                                                   lambda a, b: a - b,
-                                                   lambda a, b: a + b,
-                                                   fn_name='identity')
+        wrapped_fn = _dual_input_fn_wrapper('my_module.my_function',
+                                            lambda a, b: a - b,
+                                            lambda a, b: a + b,
+                                            fn_name='identity')
         result = wrapped_fn(np.array([-5, 2]), np.array([-5, 2]))
         assert_array_equal(result.masked_array(), [-10, 4])
 
     def test_masked_array_undefined(self):
-        wrapped_fn = biggus._dual_input_fn_wrapper('my_module.my_function',
-                                                   lambda a, b: a + b,
-                                                   fn_name='identity')
+        wrapped_fn = _dual_input_fn_wrapper('my_module.my_function',
+                                            lambda a, b: a + b,
+                                            fn_name='identity')
         msg = 'No <lambda> operation defined for masked arrays.'
         result = wrapped_fn(np.array([-5, 2]), np.array([-5, 2]))
         with self.assertRaisesRegexp(TypeError, msg):

@@ -25,6 +25,7 @@ import numpy as np
 import numpy.ma
 
 import biggus
+from biggus.tests import mock
 
 
 class _WriteCounter(object):
@@ -64,11 +65,11 @@ class TestWritePattern(unittest.TestCase):
         self.assertTrue(target.all_written())
 
     def test_large(self):
-        # Source data: 15 GB
-        small_array = self._small_array()
-        array = biggus.ArrayStack([[small_array] * 1000] * 5)
+        # Source data: 3 MB
+        array = self._small_array()
         target = _WriteCounter(array.shape)
-        biggus.save([array], [target])
+        with mock.patch('biggus._init.MAX_CHUNK_SIZE', 4096):
+            biggus.save([array], [target])
         self.assertTrue(target.all_written())
 
 

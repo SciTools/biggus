@@ -57,3 +57,12 @@ __all__ = _init.__all__
 
 
 __version__ = '0.13.0'
+
+
+engine = AllThreadedEngine()
+"""
+The current lazy evaluation engine.
+
+Defaults to an instance of :class:`AllThreadedEngine`.
+
+"""

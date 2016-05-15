@@ -14,14 +14,14 @@
 #
 # You should have received a copy of the GNU Lesser General Public License
 # along with Biggus. If not, see <http://www.gnu.org/licenses/>.
-"""Unit tests for `biggus.NumpyArrayAdapter`."""
+"""Unit tests for `biggus._init.NumpyArrayAdapter`."""
 
 import unittest
 
 import numpy as np
 from numpy.testing import assert_array_equal
 
-from biggus import NumpyArrayAdapter, NewAxesArray
+from biggus._init import NumpyArrayAdapter, NewAxesArray
 
 
 class Test___getitem__(unittest.TestCase):

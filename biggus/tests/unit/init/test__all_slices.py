@@ -1,4 +1,4 @@
-# (C) British Crown Copyright 2014 - 2015, Met Office
+# (C) British Crown Copyright 2014 - 2016, Met Office
 #
 # This file is part of Biggus.
 #
@@ -14,14 +14,14 @@
 #
 # You should have received a copy of the GNU Lesser General Public License
 # along with Biggus. If not, see <http://www.gnu.org/licenses/>.
-"""Unit tests for `biggus._all_slices`."""
+"""Unit tests for `biggus._init._all_slices`."""
 
 import unittest
 
 import numpy as np
 
 import biggus
-from biggus import _all_slices, _all_slices_inner
+from biggus._init import _all_slices, _all_slices_inner
 from biggus.tests import set_chunk_size
 
 
