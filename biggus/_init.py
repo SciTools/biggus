@@ -1,4 +1,4 @@
-# (C) British Crown Copyright 2012 - 2015, Met Office
+# (C) British Crown Copyright 2012 - 2016, Met Office
 #
 # This file is part of Biggus.
 #
@@ -14,42 +14,6 @@
 #
 # You should have received a copy of the GNU Lesser General Public License
 # along with Biggus. If not, see <http://www.gnu.org/licenses/>.
-"""
-Virtual arrays of arbitrary size, with arithmetic and statistical
-operations, and conversion to NumPy ndarrays.
-
-Virtual arrays can be stacked to increase their dimensionality, or
-tiled to increase their extent.
-
-Includes support for easily wrapping data sources which produce NumPy
-ndarray objects via slicing. For example: netcdf4python Variable
-instances, and NumPy ndarray instances.
-
-All operations are performed in a lazy fashion to avoid overloading
-system resources. Conversion to a concrete NumPy ndarray requires an
-explicit method call.
-
-For example::
-
-    # Wrap two large data sources (e.g. 52000 x 800 x 600).
-    measured = OrthoArrayAdapter(netcdf_var_a)
-    predicted = OrthoArrayAdapter(netcdf_var_b)
-
-    # No actual calculations are performed here.
-    error = predicted - measured
-
-    # *Appear* to calculate the mean over the first dimension, and
-    # return a new biggus Array with the correct shape, etc.
-    # NB. No data are read and no calculations are performed.
-    mean_error = biggus.mean(error, axis=0)
-
-    # *Actually* calculate the mean, and return a NumPy ndarray.
-    # This is when the data are read, subtracted, and the mean derived,
-    # but all in a chunk-by-chunk fashion which avoids using much
-    # memory.
-    mean_error = mean_error.ndarray()
-
-"""
 from __future__ import division
 
 from abc import ABCMeta, abstractproperty, abstractmethod
@@ -66,7 +30,13 @@ import numpy as np
 import numpy.ma as ma
 
 
-__version__ = '0.13.0'
+__all__ = []
+
+
+def export(defn):
+    globals()[defn.__name__] = defn
+    __all__.append(defn.__name__)
+    return defn
 
 
 _SCALAR_KEY_TYPES = (int, np.integer)
@@ -77,6 +47,7 @@ def _is_scalar(key):
     return isinstance(key, (int, np.integer))
 
 
+@export
 class AxisSupportError(StandardError):
     """Raised when the operation is not supported over a given axis/axes."""
 
@@ -477,6 +448,7 @@ Defaults to an instance of :class:`AllThreadedEngine`.
 """
 
 
+@export
 class Array(object):
     """
     A virtual array which can be sliced to create smaller virtual
@@ -879,6 +851,7 @@ class NewAxesArray(ArrayContainer):
         return array.__getitem__(self._newaxis_keys())
 
 
+@export
 class BroadcastArray(ArrayContainer):
     def __init__(self, array, broadcast, leading_shape=()):
         """
@@ -1172,6 +1145,7 @@ class AsDataTypeArray(ArrayContainer):
                      self).masked_array().astype(self.dtype)
 
 
+@export
 class ConstantArray(Array):
     """
     An Array which is completely filled with a single value.
@@ -1231,6 +1205,7 @@ class ConstantArray(Array):
         return result
 
 
+@export
 def zeros(shape, dtype=float):
     """
     Return an Array which is completely filled with zeros.
@@ -1251,6 +1226,7 @@ def zeros(shape, dtype=float):
     return ConstantArray(shape, dtype=dtype)
 
 
+@export
 def ones(shape, dtype=float):
     """
     Return an Array which is completely filled with ones.
@@ -1453,6 +1429,7 @@ class _ArrayAdapter(Array):
         return array
 
 
+@export
 class NumpyArrayAdapter(_ArrayAdapter):
     """
     Exposes a "concrete" data source which supports NumPy "fancy
@@ -1506,6 +1483,7 @@ class NumpyArrayAdapter(_ArrayAdapter):
         return array
 
 
+@export
 class OrthoArrayAdapter(_ArrayAdapter):
     """
     Exposes a "concrete" data source which supports orthogonal indexing
@@ -1675,6 +1653,7 @@ class TransposedArray(ArrayContainer):
         return array.transpose(self.axes)
 
 
+@export
 class ArrayStack(Array):
     """
     An Array made from a homogeneous array of other Arrays.
@@ -1865,6 +1844,7 @@ class ArrayStack(Array):
             return subdivided_array[0]
 
 
+@export
 class LinearMosaic(Array):
     def __init__(self, tiles, axis):
         if not isinstance(tiles, collections.Iterable):
@@ -2033,6 +2013,7 @@ class LinearMosaic(Array):
         return data
 
 
+@export
 def ndarrays(arrays):
     """
     Return a list of NumPy ndarray objects corresponding to the given
@@ -2045,6 +2026,7 @@ def ndarrays(arrays):
     return engine.ndarrays(*arrays)
 
 
+@export
 def masked_arrays(arrays):
     """
     Return a list of NumPy masked array objects corresponding to the given
@@ -2111,6 +2093,7 @@ def _all_slices_inner(shape, always_slices=False):
     return all_slices
 
 
+@export
 def save(sources, targets, masked=False):
     """
     Save the numeric results of each source into its corresponding target.
@@ -2611,6 +2594,7 @@ def _normalise_axis(axis, array):
     return axes
 
 
+@export
 def count(a, axis=None):
     """
     Count the non-masked elements of the array along the given axis.
@@ -2638,6 +2622,7 @@ def count(a, axis=None):
                         np.dtype('i'), {})
 
 
+@export
 def min(a, axis=None):
     """
     Request the minimum of an Array over any number of axes.
@@ -2667,6 +2652,7 @@ def min(a, axis=None):
                         a.dtype, {})
 
 
+@export
 def max(a, axis=None):
     """
     Request the maximum of an Array over any number of axes.
@@ -2696,6 +2682,7 @@ def max(a, axis=None):
                         a.dtype, {})
 
 
+@export
 def sum(a, axis=None):
     """
     Request the sum of an Array over any number of axes.
@@ -2725,6 +2712,7 @@ def sum(a, axis=None):
                         a.dtype, {})
 
 
+@export
 def mean(a, axis=None, mdtol=1):
     """
     Request the mean of an Array over any number of axes.
@@ -2762,6 +2750,7 @@ def mean(a, axis=None, mdtol=1):
                         dtype, kwargs)
 
 
+@export
 def std(a, axis=None, ddof=0):
     """
     Request the standard deviation of an Array over any number of axes.
@@ -2793,6 +2782,7 @@ def std(a, axis=None, ddof=0):
                         dtype, dict(ddof=ddof))
 
 
+@export
 def var(a, axis=None, ddof=0):
     """
     Request the variance of an Array over any number of axes.
@@ -2964,7 +2954,9 @@ def _unary_fn_wrapper(name, function_to_wrap, masked_equivalent=None,
         return _Elementwise(a, None, function_to_wrap, masked_equivalent)
     doc_str = ("Return the elementwise evaluation of {}(a) "
                "as another Array.".format(name))
-    wrapped_function.__name__ = fn_name or function_to_wrap.__name__
+    name = fn_name or function_to_wrap.__name__
+    __all__.append(name)
+    wrapped_function.__name__ = name
     wrapped_function.__doc__ = doc_str
     return wrapped_function
 
@@ -2977,12 +2969,14 @@ def _dual_input_fn_wrapper(name, function_to_wrap, masked_equivalent=None,
                             masked_equivalent)
     doc_str = ("Return the elementwise evaluation of {}(a, b) "
                "as another Array.".format(name))
-    wrapped_function.__name__ = fn_name or function_to_wrap.__name__
+    name = fn_name or function_to_wrap.__name__
+    __all__.append(name)
+    wrapped_function.__name__ = name
     wrapped_function.__doc__ = doc_str
     return wrapped_function
 
 
-def _ufunc_wrapper(ufunc):
+def _ufunc_wrapper(ufunc, name=None):
     """
     A function to generate the top level biggus ufunc wrappers.
 
@@ -2990,7 +2984,9 @@ def _ufunc_wrapper(ufunc):
     if not isinstance(ufunc, np.ufunc):
         raise TypeError('{} is not a ufunc'.format(ufunc))
 
-    name = ufunc.__name__
+    if name is None:
+        name = ufunc.__name__
+    __all__.append(name)
     # Get hold of the masked array equivalent, if it exists.
     ma_ufunc = getattr(np.ma, name, None)
     if ufunc.nin == 2 and ufunc.nout == 1:
@@ -3010,7 +3006,7 @@ negative = _ufunc_wrapper(np.negative)
 absolute = _ufunc_wrapper(np.absolute)
 rint = _ufunc_wrapper(np.rint)
 sign = _ufunc_wrapper(np.sign)
-conj = _ufunc_wrapper(np.conj)
+conj = _ufunc_wrapper(np.conj, 'conj')
 exp = _ufunc_wrapper(np.exp)
 exp2 = _ufunc_wrapper(np.exp2)
 log = _ufunc_wrapper(np.log)
@@ -3188,6 +3184,7 @@ def _full_keys(keys, ndim):
     return tuple(lh_keys + middle + rh_keys[::-1])
 
 
+@export
 def ensure_array(array):
     """
     Assert that the given array is an Array subclass (or numpy array).
@@ -3208,6 +3205,7 @@ def ensure_array(array):
     return array
 
 
+@export
 def size(array):
     """
     Return a human-readable description of the number of bytes required
