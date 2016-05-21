@@ -21,7 +21,7 @@ import numpy.ma
 import numpy.testing
 
 import biggus
-from biggus.tests import AccessCounter
+from biggus.tests import AccessCounter, mock
 
 
 class TestAggregation(unittest.TestCase):
@@ -176,16 +176,11 @@ class TestFlow(unittest.TestCase):
         data = np.arange(3 * 4 * 5, dtype='f4').reshape(3, 4, 5)
         array = biggus.NumpyArrayAdapter(data)
         mean = biggus.mean(array, axis=axis)
-        engine = biggus.AllThreadedEngine()
-        chunk_size = biggus.MAX_CHUNK_SIZE
-        try:
-            # Artificially constrain the chunk size to eight bytes to
-            # ensure biggus is stepping across axes in the correct
-            # order.
-            biggus.MAX_CHUNK_SIZE = 8
-            op_result, = engine.ndarrays(mean)
-        finally:
-            biggus.MAX_CHUNK_SIZE = chunk_size
+        # Artificially constrain the chunk size to eight bytes to
+        # ensure biggus is stepping across axes in the correct
+        # order.
+        with mock.patch('biggus._init.MAX_CHUNK_SIZE', 8):
+            op_result, = biggus.ndarrays([mean])
         np_result = np.mean(data, axis=axis)
         np.testing.assert_array_almost_equal(op_result, np_result)
 

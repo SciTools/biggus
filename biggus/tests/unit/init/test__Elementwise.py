@@ -1,4 +1,4 @@
-# (C) British Crown Copyright 2015, Met Office
+# (C) British Crown Copyright 2015 - 2016, Met Office
 #
 # This file is part of Biggus.
 #
@@ -24,7 +24,7 @@ import numpy as np
 import numpy.ma as ma
 from numpy.testing import assert_array_equal
 
-from biggus import _Elementwise as Elementwise
+from biggus._init import _Elementwise as Elementwise
 
 
 class Test__masked_arrays(unittest.TestCase):

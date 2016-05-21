@@ -1,4 +1,4 @@
-# (C) British Crown Copyright 2014, Met Office
+# (C) British Crown Copyright 2014 - 2016, Met Office
 #
 # This file is part of Biggus.
 #
@@ -14,28 +14,28 @@
 #
 # You should have received a copy of the GNU Lesser General Public License
 # along with Biggus. If not, see <http://www.gnu.org/licenses/>.
-"""Unit tests for `biggus.min`."""
+"""Unit tests for `biggus.sum`."""
 
 import numpy as np
 import numpy.ma as ma
 import unittest
 
 import biggus
-import biggus.tests.unit._aggregation_test_framework as test_framework
+import biggus.tests.unit.init._aggregation_test_framework as test_framework
 
 
 class Operator(object):
     @property
     def biggus_operator(self):
-        return biggus.min
+        return biggus.sum
 
     @property
     def numpy_operator(self):
-        return np.min
+        return np.sum
 
     @property
     def numpy_masked_operator(self):
-        return ma.min
+        return ma.sum
 
 
 class TestInvalidAxis(Operator, test_framework.InvalidAxis, unittest.TestCase):

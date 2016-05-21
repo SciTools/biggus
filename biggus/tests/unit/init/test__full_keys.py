@@ -1,4 +1,4 @@
-# (C) British Crown Copyright 2015, Met Office
+# (C) British Crown Copyright 2015 - 2016, Met Office
 #
 # This file is part of Biggus.
 #
@@ -21,7 +21,7 @@ import unittest
 import numpy as np
 from numpy.testing import assert_array_equal
 
-from biggus import _full_keys
+from biggus._init import _full_keys
 
 
 class Test__full_keys(unittest.TestCase):

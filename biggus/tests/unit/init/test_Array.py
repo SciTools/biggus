@@ -1,4 +1,4 @@
-# (C) British Crown Copyright 2014, Met Office
+# (C) British Crown Copyright 2014 - 2016, Met Office
 #
 # This file is part of Biggus.
 #
@@ -14,7 +14,7 @@
 #
 # You should have received a copy of the GNU Lesser General Public License
 # along with Biggus. If not, see <http://www.gnu.org/licenses/>.
-"""Unit tests for `biggus.Array`."""
+"""Unit tests for `biggus._init.Array`."""
 from __future__ import division
 
 import sys
@@ -23,8 +23,8 @@ import unittest
 import numpy as np
 from numpy.testing import assert_array_equal
 
-import biggus
-from biggus import Array
+import biggus._init
+from biggus._init import Array
 
 
 RESULT_NDARRAY = np.arange(12).reshape(3, 4)
@@ -152,7 +152,7 @@ class Test_astype(unittest.TestCase):
     def test(self):
         array = FakeArray((2, 3, 4))
         result = array.astype('>f32')
-        self.assertIsInstance(result, biggus.AsDataTypeArray)
+        self.assertIsInstance(result, biggus._init.AsDataTypeArray)
         self.assertEqual(result.dtype, '>f32')
 
 
@@ -160,13 +160,13 @@ class Test_transpose(unittest.TestCase):
     def test_default(self):
         array = FakeArray((2, 3, 4))
         result = array.transpose()
-        self.assertIsInstance(result, biggus.TransposedArray)
+        self.assertIsInstance(result, biggus._init.TransposedArray)
         self.assertEqual(tuple(result.axes), (2, 1, 0))
 
     def test_explicit(self):
         array = FakeArray((2, 3, 4))
         result = array.transpose((1, 2, 0))
-        self.assertIsInstance(result, biggus.TransposedArray)
+        self.assertIsInstance(result, biggus._init.TransposedArray)
         self.assertEqual(result.axes, (1, 2, 0))
 
 
@@ -183,7 +183,7 @@ class Test___add__(unittest.TestCase, AssertElementwiseMixin):
         a = FakeArray([2, 4])
         b = FakeArray([2, 4])
         r = a + b
-        self.assertIsInstance(r, biggus._Elementwise)
+        self.assertIsInstance(r, biggus._init._Elementwise)
         self.assertElementwise(r, biggus.add(a, b))
 
     def test_other_no_good(self):
@@ -194,7 +194,7 @@ class Test___add__(unittest.TestCase, AssertElementwiseMixin):
     def test___radd__(self):
         a = biggus.NumpyArrayAdapter(RESULT_NDARRAY)
         r = 5 + a
-        self.assertIsInstance(r, biggus._Elementwise)
+        self.assertIsInstance(r, biggus._init._Elementwise)
         assert_array_equal(r.ndarray(), 5 + RESULT_NDARRAY)
 
 
@@ -203,8 +203,8 @@ class Test___sub__(unittest.TestCase, AssertElementwiseMixin):
         a = FakeArray([2, 4])
         b = FakeArray([2, 4])
         r = a - b
-        self.assertIsInstance(r, biggus._Elementwise)
-        self.assertElementwise(r, biggus.sub(a, b))
+        self.assertIsInstance(r, biggus._init._Elementwise)
+        self.assertElementwise(r, biggus.subtract(a, b))
 
     def test_other_no_good(self):
         a = FakeArray([2, 2])
@@ -214,7 +214,7 @@ class Test___sub__(unittest.TestCase, AssertElementwiseMixin):
     def test___rsub__(self):
         a = biggus.NumpyArrayAdapter(RESULT_NDARRAY)
         r = 5 - a
-        self.assertIsInstance(r, biggus._Elementwise)
+        self.assertIsInstance(r, biggus._init._Elementwise)
         assert_array_equal(r.ndarray(), 5 - RESULT_NDARRAY)
 
 
@@ -223,7 +223,7 @@ class Test___mul__(unittest.TestCase, AssertElementwiseMixin):
         a = FakeArray([2, 4])
         b = FakeArray([2, 4])
         r = a * b
-        self.assertIsInstance(r, biggus._Elementwise)
+        self.assertIsInstance(r, biggus._init._Elementwise)
         self.assertElementwise(r, biggus.multiply(a, b))
 
     def test_other_no_good(self):
@@ -234,7 +234,7 @@ class Test___mul__(unittest.TestCase, AssertElementwiseMixin):
     def test___rmul__(self):
         a = biggus.NumpyArrayAdapter(RESULT_NDARRAY)
         r = 5 * a
-        self.assertIsInstance(r, biggus._Elementwise)
+        self.assertIsInstance(r, biggus._init._Elementwise)
         assert_array_equal(r.ndarray(), 5 * RESULT_NDARRAY)
 
 
@@ -243,7 +243,7 @@ class Test___floordiv__(unittest.TestCase, AssertElementwiseMixin):
         a = FakeArray([2, 4])
         b = FakeArray([2, 4])
         r = a // b
-        self.assertIsInstance(r, biggus._Elementwise)
+        self.assertIsInstance(r, biggus._init._Elementwise)
         self.assertElementwise(r, biggus.floor_divide(a, b))
 
     def test_other_no_good(self):
@@ -254,7 +254,7 @@ class Test___floordiv__(unittest.TestCase, AssertElementwiseMixin):
     def test___rfloordiv__(self):
         a = biggus.NumpyArrayAdapter(RESULT_NDARRAY + 10)
         r = 5 // a
-        self.assertIsInstance(r, biggus._Elementwise)
+        self.assertIsInstance(r, biggus._init._Elementwise)
         assert_array_equal(r.ndarray(), 5 // (RESULT_NDARRAY + 10))
 
 
@@ -263,7 +263,7 @@ class Test___div__(unittest.TestCase, AssertElementwiseMixin):
         a = FakeArray([2, 4])
         b = FakeArray([2, 4])
         r = a.__div__(b)
-        self.assertIsInstance(r, biggus._Elementwise)
+        self.assertIsInstance(r, biggus._init._Elementwise)
         self.assertElementwise(r, biggus.divide(a, b))
 
     def test_other_no_good(self):
@@ -275,7 +275,7 @@ class Test___div__(unittest.TestCase, AssertElementwiseMixin):
         if sys.version_info[0] == 2:
             a = biggus.NumpyArrayAdapter(RESULT_NDARRAY + 10)
             r = 5 / a
-            self.assertIsInstance(r, biggus._Elementwise)
+            self.assertIsInstance(r, biggus._init._Elementwise)
             assert_array_equal(r.ndarray(), 5 / (RESULT_NDARRAY + 10))
 
 
@@ -284,7 +284,7 @@ class Test___trudiv__(unittest.TestCase, AssertElementwiseMixin):
         a = FakeArray([2, 4])
         b = FakeArray([2, 4])
         r = a / b
-        self.assertIsInstance(r, biggus._Elementwise)
+        self.assertIsInstance(r, biggus._init._Elementwise)
         self.assertElementwise(r, biggus.true_divide(a, b))
 
     def test_other_no_good(self):
@@ -295,7 +295,7 @@ class Test___trudiv__(unittest.TestCase, AssertElementwiseMixin):
     def test___rtrudiv__(self):
         a = biggus.NumpyArrayAdapter(RESULT_NDARRAY + 10)
         r = 5 / a
-        self.assertIsInstance(r, biggus._Elementwise)
+        self.assertIsInstance(r, biggus._init._Elementwise)
         assert_array_equal(r.ndarray(), 5 / (RESULT_NDARRAY + 10))
 
 
@@ -304,7 +304,7 @@ class Test___pow__(unittest.TestCase, AssertElementwiseMixin):
         a = FakeArray([2, 4])
         b = FakeArray([2, 4])
         r = a ** b
-        self.assertIsInstance(r, biggus._Elementwise)
+        self.assertIsInstance(r, biggus._init._Elementwise)
         self.assertElementwise(r, biggus.power(a, b))
 
     def test_other_no_good(self):
@@ -315,7 +315,7 @@ class Test___pow__(unittest.TestCase, AssertElementwiseMixin):
     def test___rpow__(self):
         a = biggus.NumpyArrayAdapter(RESULT_NDARRAY)
         r = 5 ** a
-        self.assertIsInstance(r, biggus._Elementwise)
+        self.assertIsInstance(r, biggus._init._Elementwise)
         assert_array_equal(r.ndarray(), 5 ** RESULT_NDARRAY)
 
 

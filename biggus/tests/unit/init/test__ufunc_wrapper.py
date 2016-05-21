@@ -1,4 +1,4 @@
-# (C) British Crown Copyright 2015, Met Office
+# (C) British Crown Copyright 2015 - 2016, Met Office
 #
 # This file is part of Biggus.
 #
@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with Biggus. If not, see <http://www.gnu.org/licenses/>.
 """
-Unit tests for `biggus._ufunc_wrapper` and the functions that it
+Unit tests for `biggus._init._ufunc_wrapper` and the functions that it
 has wrapped.
 
 """
@@ -30,11 +30,13 @@ from numpy.testing import assert_array_equal
 from numpy.ma.testutils import assert_array_equal as assert_masked_array_equal
 
 import biggus
+from biggus.tests import mock
+from biggus._init import _ufunc_wrapper
 
 
 class Test__unary_fn_wrapper(unittest.TestCase):
     def test_nin2_docstring(self):
-        wrapped_fn = biggus._ufunc_wrapper(np.add)
+        wrapped_fn = _ufunc_wrapper(np.add)
         doc = inspect.getdoc(wrapped_fn)
 
         expected = ('Return the elementwise evaluation of '
@@ -42,7 +44,7 @@ class Test__unary_fn_wrapper(unittest.TestCase):
         self.assertEqual(doc, expected)
 
     def test_nin1_docstring(self):
-        wrapped_fn = biggus._ufunc_wrapper(np.negative)
+        wrapped_fn = _ufunc_wrapper(np.negative)
         doc = inspect.getdoc(wrapped_fn)
 
         expected = ('Return the elementwise evaluation of '
@@ -52,12 +54,22 @@ class Test__unary_fn_wrapper(unittest.TestCase):
     def test_non_ufunc(self):
         msg = 'not a ufunc'
         with self.assertRaisesRegexp(TypeError, msg):
-            biggus._ufunc_wrapper(lambda x: x)
+            _ufunc_wrapper(lambda x: x)
 
     def test_nout2_ufunc(self):
         msg = "Unsupported ufunc 'modf' with 1 input arrays & 2 output arrays."
         with self.assertRaisesRegexp(ValueError, msg):
-            biggus._ufunc_wrapper(np.modf)
+            _ufunc_wrapper(np.modf)
+
+    def test_updates_all_default_name(self):
+        with mock.patch('biggus._init.__all__', []) as tmp_all:
+            _ufunc_wrapper(np.exp)
+        self.assertEqual(tmp_all, ['exp'])
+
+    def test_updates_all_override_name(self):
+        with mock.patch('biggus._init.__all__', []) as tmp_all:
+            _ufunc_wrapper(np.exp, 'foo')
+        self.assertEqual(tmp_all, ['foo'])
 
 
 class Test_wrapped_functions(unittest.TestCase):
