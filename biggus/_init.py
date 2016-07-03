@@ -1689,9 +1689,11 @@ class ArrayStack(Array):
         self._item_shape = item_shape
         self._dtype = dtype
         if fill_value is None:
-            self._fill_value = np.ma.empty(0, dtype=dtype).fill_value
-        else:
-            self._fill_value = fill_value
+            fill_value = np.ma.empty(0, dtype=dtype).fill_value
+            if dtype.kind == 'S':
+                # Ensure this is consistent across NumPy versions.
+                fill_value = dtype.type(fill_value)
+        self._fill_value = fill_value
 
     def __deepcopy__(self, memo):
         # We override deepcopy here as a result of
@@ -1882,9 +1884,11 @@ class LinearMosaic(Array):
         self._axis = axis
         self._cached_shape = None
         if common_fill_value is None:
-            self._fill_value = np.ma.empty(0, dtype=common_dtype).fill_value
-        else:
-            self._fill_value = common_fill_value
+            common_fill_value = np.ma.empty(0, dtype=common_dtype).fill_value
+            if common_dtype.kind == 'S':
+                # Ensure this is consistent across NumPy versions.
+                common_fill_value = common_dtype.type(common_fill_value)
+        self._fill_value = common_fill_value
 
     @property
     def dtype(self):
