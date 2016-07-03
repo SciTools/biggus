@@ -177,7 +177,7 @@ class _TestAdapter(object):
         return self.wrap(ndarray, keys)
 
     def arange_adapter(self, shape, keys):
-        size = reduce(lambda x, y: x * y, shape)
+        size = np.product(shape)
         ndarray = np.arange(size).reshape(shape)
         return self.wrap(ndarray, keys)
 
