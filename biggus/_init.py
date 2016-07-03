@@ -2310,9 +2310,12 @@ class _SumMaskedStreamsHandler(_AggregationStreamsHandler):
     def bootstrap(self, processed_chunk_shape):
         self.running_total = np.ma.zeros(processed_chunk_shape,
                                          dtype=self.array.dtype)
+        # Start out all masked, and unmask if something is not masked.
+        self.mask = np.ones_like(self.running_total, dtype=bool)
 
     def finalise(self):
         array = self.running_total
+        array.mask = self.mask
         # Promote array-scalar to 0-dimensional array.
         if array.ndim == 0:
             array = np.ma.array(array)
@@ -2320,7 +2323,8 @@ class _SumMaskedStreamsHandler(_AggregationStreamsHandler):
         return chunk
 
     def process_data(self, data):
-        self.running_total += np.sum(data, axis=self.axis)
+        self.mask &= np.all(data.mask, axis=self.axis)
+        self.running_total += np.sum(data.filled(0), axis=self.axis)
 
 
 class _MeanStreamsHandler(_AggregationStreamsHandler):
