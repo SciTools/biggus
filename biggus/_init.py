@@ -50,7 +50,7 @@ def _is_scalar(key):
 
 
 @export
-class AxisSupportError(StandardError):
+class AxisSupportError(Exception):
     """Raised when the operation is not supported over a given axis/axes."""
 
 
