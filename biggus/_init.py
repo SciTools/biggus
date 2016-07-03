@@ -1082,7 +1082,9 @@ class BroadcastArray(ArrayContainer):
         strides = [0] * len(leading_shape) + list(array.strides)
         for broadcast_axis in broadcast_dict:
             strides[broadcast_axis + len(leading_shape)] = 0
-        return as_strided(array, shape=tuple(shape), strides=tuple(strides))
+        strided = as_strided(array, shape=tuple(shape), strides=tuple(strides))
+        strided.flags.writeable = False  # Fix bug in NumPy 1.10.1.
+        return strided
 
     def ndarray(self):
         array = super(BroadcastArray, self).ndarray()
