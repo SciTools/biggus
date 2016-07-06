@@ -1139,6 +1139,52 @@ class AsDataTypeArray(ArrayContainer):
                      self).masked_array().astype(self.dtype)
 
 
+class MaskValueArray(ArrayContainer):
+    """A biggus.Array that masks all values matching a given value."""
+    def __init__(self, array, mask_value):
+        """
+        Parameters
+        ----------
+        array : array-like
+            The array to be masked.
+        mask_value : obj
+            The value to mask
+
+        """
+        super(MaskValueArray, self).__init__(array)
+        self._mask_value = mask_value
+
+    def __getitem__(self, keys):
+        return type(self)(super(MaskValueArray, self).__getitem__(keys),
+                          self._mask_value)
+
+    def masked_array(self):
+        return np.ma.masked_equal(super(MaskValueArray, self).masked_array(),
+                                  self._mask_value)
+
+
+@export
+def masked_equal(array, value):
+    """
+    Mask an array where equal to a given value.
+
+    Parameters
+    ----------
+    array : array-like
+        The array to be masked.
+    value : obj
+        The value to mask
+
+    Returns
+    -------
+    Array
+        ``array`` masked where equal to ``value``
+
+    """
+
+    return MaskValueArray(array, value)
+
+
 @export
 class ConstantArray(Array):
     """
