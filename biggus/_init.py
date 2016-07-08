@@ -674,6 +674,7 @@ class Array(object):
 #            return NotImplemented
 
 
+@export
 class ArrayContainer(Array):
     "A biggus.Array which passes calls through to the contained array."
     def __init__(self, contained_array):
