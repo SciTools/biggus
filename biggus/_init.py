@@ -1083,7 +1083,9 @@ class BroadcastArray(ArrayContainer):
         strides = [0] * len(leading_shape) + list(array.strides)
         for broadcast_axis in broadcast_dict:
             strides[broadcast_axis + len(leading_shape)] = 0
-        return as_strided(array, shape=tuple(shape), strides=tuple(strides))
+        strided = as_strided(array, shape=tuple(shape), strides=tuple(strides))
+        strided.flags.writeable = False  # Fix bug in NumPy 1.10.1.
+        return strided
 
     def ndarray(self):
         array = super(BroadcastArray, self).ndarray()
@@ -1688,9 +1690,11 @@ class ArrayStack(Array):
         self._item_shape = item_shape
         self._dtype = dtype
         if fill_value is None:
-            self._fill_value = np.ma.empty(0, dtype=dtype).fill_value
-        else:
-            self._fill_value = fill_value
+            fill_value = np.ma.empty(0, dtype=dtype).fill_value
+            if dtype.kind == 'S':
+                # Ensure this is consistent across NumPy versions.
+                fill_value = dtype.type(fill_value)
+        self._fill_value = fill_value
 
     def __deepcopy__(self, memo):
         # We override deepcopy here as a result of
@@ -1881,9 +1885,11 @@ class LinearMosaic(Array):
         self._axis = axis
         self._cached_shape = None
         if common_fill_value is None:
-            self._fill_value = np.ma.empty(0, dtype=common_dtype).fill_value
-        else:
-            self._fill_value = common_fill_value
+            common_fill_value = np.ma.empty(0, dtype=common_dtype).fill_value
+            if common_dtype.kind == 'S':
+                # Ensure this is consistent across NumPy versions.
+                common_fill_value = common_dtype.type(common_fill_value)
+        self._fill_value = common_fill_value
 
     @property
     def dtype(self):
@@ -2311,9 +2317,12 @@ class _SumMaskedStreamsHandler(_AggregationStreamsHandler):
     def bootstrap(self, processed_chunk_shape):
         self.running_total = np.ma.zeros(processed_chunk_shape,
                                          dtype=self.array.dtype)
+        # Start out all masked, and unmask if something is not masked.
+        self.mask = np.ones_like(self.running_total, dtype=bool)
 
     def finalise(self):
         array = self.running_total
+        array.mask = self.mask
         # Promote array-scalar to 0-dimensional array.
         if array.ndim == 0:
             array = np.ma.array(array)
@@ -2321,7 +2330,8 @@ class _SumMaskedStreamsHandler(_AggregationStreamsHandler):
         return chunk
 
     def process_data(self, data):
-        self.running_total += np.sum(data, axis=self.axis)
+        self.mask &= np.all(data.mask, axis=self.axis)
+        self.running_total += np.sum(data.filled(0), axis=self.axis)
 
 
 class _MeanStreamsHandler(_AggregationStreamsHandler):
@@ -2395,8 +2405,8 @@ class _StdStreamsHandler(_AggregationStreamsHandler):
 
     def bootstrap(self, processed_chunk_shape):
         self.k = 1
-        dtype = (np.zeros(1, dtype=self.array.dtype) / 1.).dtype
-        self.q = np.zeros(processed_chunk_shape, dtype=dtype)
+        self._dtype = (np.zeros(1, dtype=self.array.dtype) / 1.).dtype
+        self.q = np.zeros(processed_chunk_shape, dtype=self._dtype)
 
     def finalise(self):
         self.q /= (self.k - self.ddof)
@@ -2408,10 +2418,10 @@ class _StdStreamsHandler(_AggregationStreamsHandler):
         return chunk
 
     def process_data(self, data):
-        data = np.rollaxis(data, self.axis)
+        data = np.rollaxis(data, self.axis).astype(self._dtype)
 
         if self.k == 1:
-            self.a = data[0].copy()
+            self.a = data[0]
             data = data[1:]
 
         for data_slice in data:

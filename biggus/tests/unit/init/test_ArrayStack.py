@@ -83,7 +83,7 @@ class Test___init___fill_values(unittest.TestCase):
         array1 = fake_array('foo', np.dtype('S3'))
         array2 = fake_array('bar', np.dtype('S3'))
         stack = ArrayStack(np.array([array1, array2]))
-        self.assertEqual(stack.fill_value, 'N/A')
+        self.assertEqual(stack.fill_value, b'N/A')
 
 
 class Test_multidim_array_stack(unittest.TestCase):

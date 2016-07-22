@@ -82,7 +82,7 @@ class Test___init___fill_values(unittest.TestCase):
         array1 = fake_array('foo', np.dtype('S3'))
         array2 = fake_array('bar', np.dtype('S3'))
         mosaic = LinearMosaic(np.array([array1, array2]), 0)
-        self.assertEqual(mosaic.fill_value, 'N/A')
+        self.assertEqual(mosaic.fill_value, b'N/A')
 
 
 class Test___getitem__(unittest.TestCase):

@@ -27,8 +27,8 @@ from biggus._init import ArrayContainer, NumpyArrayAdapter, AsDataTypeArray
 class Test___init__(unittest.TestCase):
     def test_nd_array(self):
         orig = np.arange(24)
-        array = AsDataTypeArray(orig, '>f32')
-        self.assertEqual(array.dtype, '>f32')
+        array = AsDataTypeArray(orig, '>f4')
+        self.assertEqual(array.dtype, '>f4')
         self.assertIs(array.array, orig)
 
 
@@ -41,17 +41,17 @@ class Test___getitem__(unittest.TestCase):
 class Test_ndarray(unittest.TestCase):
     def test_nd_array(self):
         orig = np.arange(3)
-        array = AsDataTypeArray(orig, '>f32')
-        assert_array_equal(array.ndarray(), np.array([0, 1, 2], dtype='>f32'))
+        array = AsDataTypeArray(orig, '>f4')
+        assert_array_equal(array.ndarray(), np.array([0, 1, 2], dtype='>f4'))
 
 
 class Test_masked_array(unittest.TestCase):
     def test_nd_array(self):
         orig = np.arange(3)
-        array = AsDataTypeArray(orig, '>f32')
+        array = AsDataTypeArray(orig, '>f4')
         self.assertIsInstance(array.masked_array(), np.ma.masked_array)
         assert_array_equal(array.masked_array(),
-                           np.array([0, 1, 2], dtype='>f32'))
+                           np.array([0, 1, 2], dtype='>f4'))
 
 
 if __name__ == '__main__':
