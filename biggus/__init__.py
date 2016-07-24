@@ -50,6 +50,9 @@ For example::
     mean_error = mean_error.ndarray()
 
 """
+
+from __future__ import absolute_import
+
 from ._init import *
 
 

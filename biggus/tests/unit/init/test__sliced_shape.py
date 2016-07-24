@@ -16,6 +16,8 @@
 # along with Biggus. If not, see <http://www.gnu.org/licenses/>.
 """Unit tests for `biggus._init._sliced_shape`."""
 
+from __future__ import absolute_import
+
 import unittest
 
 import numpy as np

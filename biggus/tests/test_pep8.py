@@ -1,4 +1,4 @@
-# (C) British Crown Copyright 2013, Met Office
+# (C) British Crown Copyright 2013 - 2016, Met Office
 #
 # This file is part of Biggus.
 #
@@ -18,6 +18,8 @@
 Perform a PEP8 conformance test of the Biggus code base.
 
 """
+from __future__ import absolute_import
+
 import os
 import unittest
 

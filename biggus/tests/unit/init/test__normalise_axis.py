@@ -16,6 +16,8 @@
 # along with Biggus. If not, see <http://www.gnu.org/licenses/>.
 """Unit tests for `biggus._init._normalise_axis`."""
 
+from __future__ import absolute_import
+
 import unittest
 
 from biggus._init import _normalise_axis

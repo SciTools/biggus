@@ -20,6 +20,8 @@ has wrapped.
 
 """
 
+from __future__ import absolute_import
+
 import inspect
 import unittest
 import warnings
