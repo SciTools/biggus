@@ -22,6 +22,7 @@ has wrapped.
 
 from __future__ import absolute_import, division, print_function
 from six.moves import (filter, input, map, range, zip)  # noqa
+import six
 
 import inspect
 import unittest
@@ -124,9 +125,9 @@ class Test_wrapped_functions(unittest.TestCase):
                 warnings.simplefilter("always")
                 actual = result.ndarray()
 
-            self.assertEqual([unicode(warning.message)
+            self.assertEqual([six.text_type(warning.message)
                               for warning in actual_warnings],
-                             [unicode(warning.message)
+                             [six.text_type(warning.message)
                               for warning in expected_warnings])
 
             error_msg = ('biggus.{} produces different results to np.{}:'
