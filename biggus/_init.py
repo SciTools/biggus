@@ -1213,7 +1213,7 @@ class ConstantArray(Array):
 
     """
     def __init__(self, shape, value=0.0, dtype=None):
-        if isinstance(shape, basestring):
+        if isinstance(shape, six.string_types):
             shape = (shape,)
         else:
             try:
@@ -1349,7 +1349,7 @@ class _ArrayAdapter(Array):
                       'size {2}'.format(key.size, axis, size)
                 raise IndexError(msg)
         elif isinstance(key, collections.Iterable) and \
-                not isinstance(key, basestring):
+                not isinstance(key, six.string_types):
             # Make sure we capture the values in case we've
             # been given a one-shot iterable, like a generator.
             key = tuple(key)
@@ -1389,7 +1389,7 @@ class _ArrayAdapter(Array):
                 raise IndexError(msg)
             result_key = tuple(np.array(indices)[new_key])
         elif isinstance(new_key, collections.Iterable) and \
-                not isinstance(new_key, basestring):
+                not isinstance(new_key, six.string_types):
             # Make sure we capture the values in case we've
             # been given a one-shot iterable, like a generator.
             new_key = tuple(new_key)
@@ -1990,7 +1990,7 @@ class LinearMosaic(Array):
                 tile_indices[axis] -= offsets[tile_index]
                 result = tile[tuple(tile_indices)]
             elif isinstance(axis_key, (slice, collections.Iterable)) and \
-                    not isinstance(axis_key, basestring):
+                    not isinstance(axis_key, six.string_types):
                 # Find the list of relevant tiles.
                 # NB. If the stride is large enough, this might not be a
                 # contiguous subset of self._tiles.
@@ -2635,7 +2635,7 @@ def _normalise_axis(axis, array):
     elif _is_scalar(axis):
         axes = (axis,)
     elif (isinstance(axis, collections.Iterable) and
-            not isinstance(axis, (basestring, collections.Mapping)) and
+            not isinstance(axis, (six.string_types, collections.Mapping)) and
             all(map(_is_scalar, axis))):
         axes = tuple(axis)
     else:
