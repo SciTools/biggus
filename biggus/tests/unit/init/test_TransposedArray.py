@@ -18,6 +18,7 @@
 
 from __future__ import absolute_import, division, print_function
 from six.moves import (filter, input, map, range, zip)  # noqa
+import six
 
 import unittest
 
@@ -34,7 +35,7 @@ class Test__apply_axes_mapping(unittest.TestCase):
 
     def test_too_few_dims(self):
         msg = 'length 3, but should be of length 4'
-        with self.assertRaisesRegexp(ValueError, msg):
+        with six.assertRaisesRegex(self, ValueError, msg):
             self.a._apply_axes_mapping(list('abc'))
 
     def test_correct_n_dims(self):
@@ -47,7 +48,7 @@ class Test__apply_axes_mapping(unittest.TestCase):
 
     def test_too_many_dims(self):
         msg = 'length 5, but should be of length 4'
-        with self.assertRaisesRegexp(ValueError, msg):
+        with six.assertRaisesRegex(self, ValueError, msg):
             self.a._apply_axes_mapping(list('abcde'))
 
 

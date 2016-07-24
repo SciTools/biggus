@@ -57,12 +57,12 @@ class Test__unary_fn_wrapper(unittest.TestCase):
 
     def test_non_ufunc(self):
         msg = 'not a ufunc'
-        with self.assertRaisesRegexp(TypeError, msg):
+        with six.assertRaisesRegex(self, TypeError, msg):
             _ufunc_wrapper(lambda x: x)
 
     def test_nout2_ufunc(self):
         msg = "Unsupported ufunc 'modf' with 1 input arrays & 2 output arrays."
-        with self.assertRaisesRegexp(ValueError, msg):
+        with six.assertRaisesRegex(self, ValueError, msg):
             _ufunc_wrapper(np.modf)
 
     def test_updates_all_default_name(self):

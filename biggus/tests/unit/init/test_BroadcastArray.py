@@ -18,6 +18,7 @@
 
 from __future__ import absolute_import, division, print_function
 from six.moves import (filter, input, map, range, zip)  # noqa
+import six
 
 import unittest
 
@@ -37,17 +38,17 @@ class Test___init__(unittest.TestCase):
 
     def test_invalid_broadcast_axis(self):
         msg = 'Axis -1 out of range \[0, 5\)'
-        with self.assertRaisesRegexp(ValueError, msg):
+        with six.assertRaisesRegex(self, ValueError, msg):
             BroadcastArray(np.empty([1, 3, 1, 5, 1]), {-1: 10})
 
     def test_invalid_broadcast_length(self):
         msg = 'Axis length must be positive. Got -1.'
-        with self.assertRaisesRegexp(ValueError, msg):
+        with six.assertRaisesRegex(self, ValueError, msg):
             BroadcastArray(np.empty([1, 3, 1, 5, 1]), {0: -1})
 
     def test_broadcasting_existing_non_len1_dimension(self):
         msg = 'Attempted to broadcast axis 0 which is of length 3.'
-        with self.assertRaisesRegexp(ValueError, msg):
+        with six.assertRaisesRegex(self, ValueError, msg):
             BroadcastArray(np.empty([3]), {0: 5})
 
     def test_nested_broadcast_avoidance(self):
@@ -66,7 +67,7 @@ class Test___init__(unittest.TestCase):
 
     def test_invalid_leading_shape(self):
         msg = 'Leading shape must all be >=1'
-        with self.assertRaisesRegexp(ValueError, msg):
+        with six.assertRaisesRegex(self, ValueError, msg):
             BroadcastArray(np.empty([1]), {}, (-1,))
 
 
@@ -224,7 +225,7 @@ class Test_compute_broadcast_dicts(unittest.TestCase):
     def test_rule3_value_error(self):
         msg = ('operands could not be broadcast together with shapes '
                '\(2\,3\) \(1\,2\,4\)')
-        with self.assertRaisesRegexp(ValueError, msg):
+        with six.assertRaisesRegex(self, ValueError, msg):
             BroadcastArray._compute_broadcast_kwargs([2, 3], [1, 2, 4])
 
 

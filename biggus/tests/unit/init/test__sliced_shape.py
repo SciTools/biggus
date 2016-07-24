@@ -18,6 +18,7 @@
 
 from __future__ import absolute_import, division, print_function
 from six.moves import (filter, input, map, range, zip)  # noqa
+import six
 
 import unittest
 
@@ -70,14 +71,14 @@ class Test__sliced_shape(unittest.TestCase):
     def test_invalid_object_indexing(self):
         keys = key_gen[np.nan]
         msg = 'Invalid indexing object "nan"'
-        with self.assertRaisesRegexp(ValueError, msg):
+        with six.assertRaisesRegex(self, ValueError, msg):
             _sliced_shape([4, 5, 6], keys)
 
     def test_invalid_object_indexing_float(self):
         # A float is a valid indexing object in numpy.
         keys = key_gen[1.2]
         msg = 'Invalid indexing object "1.2"'
-        with self.assertRaisesRegexp(ValueError, msg):
+        with six.assertRaisesRegex(self, ValueError, msg):
             _sliced_shape([4, 5, 6], keys)
 
     def test_numpy_bool_indexing(self):

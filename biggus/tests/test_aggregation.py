@@ -16,6 +16,7 @@
 # along with Biggus. If not, see <http://www.gnu.org/licenses/>.
 from __future__ import absolute_import, division, print_function
 from six.moves import (filter, input, map, range, zip)  # noqa
+import six
 
 import unittest
 
@@ -95,7 +96,7 @@ class TestAggregation(unittest.TestCase):
         # Check that the Aggregation raises a TypeError
         # if neither an Array or np.ndarray is given
         msg = "list' object has no attribute 'ndim"
-        with self.assertRaisesRegexp(AttributeError, msg):
+        with six.assertRaisesRegex(self, AttributeError, msg):
             biggus.mean([0, 1, 2, 3, 4], axis=0)
 
 

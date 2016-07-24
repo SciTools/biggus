@@ -18,6 +18,7 @@
 
 from __future__ import absolute_import, division, print_function
 from six.moves import (filter, input, map, range, zip)  # noqa
+import six
 
 import unittest
 
@@ -35,7 +36,7 @@ class Test___init___invalid(unittest.TestCase):
             ndim = 1
             shape = (4,)
         bad_arrays = [BadArray()]
-        with self.assertRaisesRegexp(ValueError, 'subclass'):
+        with six.assertRaisesRegex(self, ValueError, 'subclass'):
             LinearMosaic(bad_arrays, 0)
 
 

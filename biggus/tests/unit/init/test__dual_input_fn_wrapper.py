@@ -22,6 +22,7 @@ has wrapped.
 
 from __future__ import absolute_import, division, print_function
 from six.moves import (filter, input, map, range, zip)  # noqa
+import six
 
 import inspect
 import unittest
@@ -83,7 +84,7 @@ class Test__dual_input_fn_wrapper(unittest.TestCase):
                                             fn_name='identity')
         msg = 'No <lambda> operation defined for masked arrays.'
         result = wrapped_fn(np.array([-5, 2]), np.array([-5, 2]))
-        with self.assertRaisesRegexp(TypeError, msg):
+        with six.assertRaisesRegex(self, TypeError, msg):
             assert_array_equal(result.masked_array(), [0, 4])
 
 

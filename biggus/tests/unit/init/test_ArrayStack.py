@@ -18,6 +18,7 @@
 
 from __future__ import absolute_import, division, print_function
 from six.moves import (filter, input, map, range, zip)  # noqa
+import six
 
 import copy
 import unittest
@@ -36,7 +37,7 @@ class Test___init___invalid(unittest.TestCase):
             fill_value = 9
             shape = ()
         bad_arrays = np.array([BadArray()])
-        with self.assertRaisesRegexp(ValueError, 'subclass'):
+        with six.assertRaisesRegex(self, ValueError, 'subclass'):
             ArrayStack(bad_arrays)
 
 
@@ -146,21 +147,21 @@ class Test_multidim_array_stack(unittest.TestCase):
         # 1D stack of arrays shape (6,)
         # Specifying a stack shape that is not feasible.
         msg = 'total size of new array must be unchanged'
-        with self.assertRaisesRegexp(ValueError, msg):
+        with six.assertRaisesRegex(self, ValueError, msg):
             ArrayStack.multidim_array_stack(self.arrays, (3, 1), order='C')
 
     def test_multidim_stack_multidim(self):
         # Multidim stack of arrays shape (4, 6)
         arrays = [[ConstantArray((), i) for i in range(6)] for i in range(4)]
         msg = 'multidimensional stacks not yet supported'
-        with self.assertRaisesRegexp(ValueError, msg):
+        with six.assertRaisesRegex(self, ValueError, msg):
             ArrayStack.multidim_array_stack(arrays, (3, 2, 4))
 
     def test_order_incorrect_order(self):
         # Specifying an unknown order.
         array1 = fake_array(0)
         array2 = fake_array(0)
-        with self.assertRaisesRegexp(TypeError, 'order not understood'):
+        with six.assertRaisesRegex(self, TypeError, 'order not understood'):
             ArrayStack.multidim_array_stack([array1, array2], (1, 2),
                                             order='random')
 
