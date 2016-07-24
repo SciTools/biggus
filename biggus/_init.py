@@ -19,12 +19,12 @@ from six.moves import (filter, input, map, range, zip)  # noqa
 import six
 
 from abc import ABCMeta, abstractproperty, abstractmethod
-import __builtin__
+from six.moves import builtins
 import collections
 import functools
 import itertools
 import threading
-import Queue
+from six.moves import queue
 import sys
 import warnings
 
@@ -217,11 +217,11 @@ class ConsumerNode(Node):
         """
         Set the given nodes as inputs for this node.
 
-        Creates a limited-size Queue.Queue for each input node and
+        Creates a limited-size queue.Queue for each input node and
         registers each queue as an output of its corresponding node.
 
         """
-        self.input_queues = [Queue.Queue(maxsize=3) for _ in input_nodes]
+        self.input_queues = [queue.Queue(maxsize=3) for _ in input_nodes]
         for input_node, input_queue in zip(input_nodes, self.input_queues):
             input_node.add_output_queue(input_queue)
 
@@ -2596,7 +2596,7 @@ class _Aggregation(ComputedArray):
         # Reduce the aggregation-axis by the number of prior dimensions that
         # get removed by the indexing operation.
         scalar_axes = map(_is_scalar, keys[:self._axis])
-        result_axis = self._axis - __builtin__.sum(scalar_axes)
+        result_axis = self._axis - builtins.sum(scalar_axes)
         return _Aggregation(self._array[keys], result_axis,
                             self._streams_handler_class,
                             self._masked_streams_handler_class,
@@ -3163,7 +3163,7 @@ def _sliced_shape(shape, keys):
             sliced_shape.append(size)
         elif isinstance(key, np.ndarray) and key.dtype == np.dtype('bool'):
             # Numpy boolean indexing.
-            sliced_shape.append(__builtin__.sum(key))
+            sliced_shape.append(builtins.sum(key))
         elif isinstance(key, (tuple, np.ndarray)):
             sliced_shape.append(len(key))
         elif key is np.newaxis:
