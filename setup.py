@@ -48,7 +48,6 @@ setup(
                  'Programming Language :: Python :: 3.5'],
     description='Virtual large arrays and lazy evaluation',
     long_description=open('README.rst').read(),
-    use_2to3=True,
     test_suite='biggus.tests',
     cmdclass={'clean_source': CleanSource}
 )
