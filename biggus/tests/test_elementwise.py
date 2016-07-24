@@ -15,6 +15,7 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with Biggus. If not, see <http://www.gnu.org/licenses/>.
 from __future__ import absolute_import, division, print_function
+from six.moves import (filter, input, map, range, zip)  # noqa
 
 import unittest
 
@@ -124,7 +125,7 @@ class TestElementwise(unittest.TestCase):
         # Check that the ElementWise functionality raises a TypeError
         # if neither an Array or np.ndarray is given
         with self.assertRaises(TypeError):
-            biggus.add(range(12), np.arange(12))
+            biggus.add(list(range(12)), np.arange(12))
 
 
 if __name__ == '__main__':

@@ -17,6 +17,7 @@
 """Unit tests for `biggus._Elementwise`."""
 
 from __future__ import absolute_import, division, print_function
+from six.moves import (filter, input, map, range, zip)  # noqa
 
 from itertools import permutations
 from functools import partial

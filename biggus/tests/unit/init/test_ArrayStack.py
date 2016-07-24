@@ -17,6 +17,7 @@
 """Unit tests for `biggus.ArrayStack`."""
 
 from __future__ import absolute_import, division, print_function
+from six.moves import (filter, input, map, range, zip)  # noqa
 
 import copy
 import unittest
@@ -95,7 +96,7 @@ class Test_multidim_array_stack(unittest.TestCase):
     def test_stack_order_c_numpy_array_t1(self):
         # 1D stack of arrays shape (6,)
         res = ArrayStack.multidim_array_stack(self.arrays, (3, 2), order='C')
-        arr = np.array([i for i in range(6)])
+        arr = np.arange(6)
         target = np.reshape(arr, (3, 2), order='C')
         self.assertTrue(np.array_equal(res.ndarray(), target))
 
@@ -103,7 +104,7 @@ class Test_multidim_array_stack(unittest.TestCase):
         # 1D stack of arrays shape (6,)
         # alternate shape
         res = ArrayStack.multidim_array_stack(self.arrays, (2, 3), order='C')
-        arr = np.array([i for i in range(6)])
+        arr = np.arange(6)
         target = np.reshape(arr, (2, 3), order='C')
         self.assertTrue(np.array_equal(res.ndarray(), target))
 
@@ -120,7 +121,7 @@ class Test_multidim_array_stack(unittest.TestCase):
         # 1D stack of arrays shape (6,)
         # Ensure that the default index ordering corresponds to C.
         res = ArrayStack.multidim_array_stack(self.arrays, (3, 2))
-        arr = np.array([i for i in range(6)])
+        arr = np.arange(6)
         target = np.reshape(arr, (3, 2), order='C')
         self.assertTrue(np.array_equal(res.ndarray(), target))
 
@@ -128,7 +129,7 @@ class Test_multidim_array_stack(unittest.TestCase):
         # Fortran index ordering
         # 1D stack of arrays shape (6,)
         res = ArrayStack.multidim_array_stack(self.arrays, (3, 2), order='F')
-        arr = np.array([i for i in range(6)])
+        arr = np.arange(6)
         target = np.reshape(arr, (3, 2), order='F')
         self.assertTrue(np.array_equal(res.ndarray(), target))
 
@@ -137,7 +138,7 @@ class Test_multidim_array_stack(unittest.TestCase):
         # 1D stack of arrays shape (6,)
         # alternate shape
         res = ArrayStack.multidim_array_stack(self.arrays, (2, 3), order='F')
-        arr = np.array([i for i in range(6)])
+        arr = np.arange(6)
         target = np.reshape(arr, (2, 3), order='F')
         self.assertTrue(np.array_equal(res.ndarray(), target))
 

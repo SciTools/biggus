@@ -15,6 +15,7 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with Biggus. If not, see <http://www.gnu.org/licenses/>.
 from __future__ import absolute_import, division, print_function
+from six.moves import (filter, input, map, range, zip)  # noqa
 
 from abc import ABCMeta, abstractproperty, abstractmethod
 import __builtin__
@@ -399,7 +400,7 @@ class AllThreadedEngine(Engine):
             result_nodes = []
             result_threads = []
             for array in self.arrays:
-                iteration_order = range(array.ndim)
+                iteration_order = list(range(array.ndim))
                 node = self._make_node(array, iteration_order, masked)
                 result_node = NdarrayNode(array, masked)
                 result_node.add_input_nodes([node])
@@ -422,7 +423,7 @@ class AllThreadedEngine(Engine):
     def _groups(self, arrays):
         # XXX Placeholder implementation which assumes everything
         # is compatible and can be evaluated in parallel.
-        return [self.Group(arrays, range(len(arrays)))]
+        return [self.Group(arrays, list(range(len(arrays))))]
 
     def _evaluate(self, arrays, masked):
         # Figure out which arrays should be evaluated in parallel.
@@ -1511,7 +1512,7 @@ class NumpyArrayAdapter(_ArrayAdapter):
                 for i, key in tuple_keys:
                     cut_keys[i] = slice(None)
                 array = self.concrete[tuple(cut_keys)]
-                is_scalar = map(_is_scalar, cut_keys)
+                is_scalar = list(map(_is_scalar, cut_keys))
                 dimensions -= np.cumsum(is_scalar)
             else:
                 # Use ellipsis indexing to ensure we have a real ndarray
@@ -1563,7 +1564,7 @@ def _pairwise(iterable):
     """
     a, b = itertools.tee(iterable)
     next(b, None)
-    return itertools.izip(a, b)
+    return zip(a, b)
 
 
 def _groups_of(length, total_length):
@@ -1973,7 +1974,7 @@ class LinearMosaic(Array):
             # then it's safe to just pass the keys to each tile.
             tile = self._tiles[0]
             tiles = [tile[keys] for tile in self._tiles]
-            scalar_keys = filter(_is_scalar, keys)
+            scalar_keys = list(filter(_is_scalar, keys))
             result = LinearMosaic(tiles, axis - len(scalar_keys))
         else:
             axis_lengths = [tile.shape[axis] for tile in self._tiles]
@@ -1998,7 +1999,7 @@ class LinearMosaic(Array):
                 else:
                     all_axis_indices = tuple(axis_key)
                 tile_indices = np.searchsorted(splits, all_axis_indices) - 1
-                pairs = itertools.izip(all_axis_indices, tile_indices)
+                pairs = zip(all_axis_indices, tile_indices)
                 i = itertools.groupby(pairs, lambda axis_tile: axis_tile[1])
                 tiles = []
                 tile_slice = list(keys)
@@ -2126,7 +2127,7 @@ def _all_slices_inner(shape, always_slices=False):
             if always_slices:
                 slices = [slice(i, i + 1) for i in range(size)]
             else:
-                slices = range(size)
+                slices = list(range(size))
         # Otherwise we have found the dimension that reaches the MAX_CHUNK_SIZE
         # limit, so we apply a range which gives chunk sizes as close to the
         # MAX_CHUNK_SIZE as possible.
