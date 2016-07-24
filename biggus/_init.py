@@ -16,6 +16,7 @@
 # along with Biggus. If not, see <http://www.gnu.org/licenses/>.
 from __future__ import absolute_import, division, print_function
 from six.moves import (filter, input, map, range, zip)  # noqa
+import six
 
 from abc import ABCMeta, abstractproperty, abstractmethod
 import __builtin__
@@ -408,7 +409,7 @@ class AllThreadedEngine(Engine):
                 result_nodes.append(result_node)
 
             # Start up all the producer/computation threads.
-            for node in self._node_cache.itervalues():
+            for node in six.itervalues(self._node_cache):
                 node.thread()
 
             # Wait for the result threads to finish.
