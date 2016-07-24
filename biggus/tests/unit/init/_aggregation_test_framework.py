@@ -16,7 +16,7 @@
 # along with Biggus. If not, see <http://www.gnu.org/licenses/>.
 """Unit tests for `biggus` aggregation operators."""
 
-from __future__ import absolute_import
+from __future__ import absolute_import, division
 
 from abc import ABCMeta, abstractproperty
 

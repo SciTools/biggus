@@ -16,4 +16,4 @@
 # along with Biggus. If not, see <http://www.gnu.org/licenses/>.
 """Integration tests for biggus."""
 
-from __future__ import absolute_import
+from __future__ import absolute_import, division

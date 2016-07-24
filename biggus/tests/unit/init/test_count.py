@@ -16,7 +16,7 @@
 # along with Biggus. If not, see <http://www.gnu.org/licenses/>.
 """Unit tests for `biggus.count`."""
 
-from __future__ import absolute_import
+from __future__ import absolute_import, division
 
 import numpy as np
 import numpy.ma as ma

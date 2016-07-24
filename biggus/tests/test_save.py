@@ -19,7 +19,7 @@ Unit tests for `biggus.save()`.
 
 """
 
-from __future__ import absolute_import
+from __future__ import absolute_import, division
 
 import unittest
 

@@ -16,7 +16,7 @@
 # along with Biggus. If not, see <http://www.gnu.org/licenses/>.
 """Integration tests for swappable engine."""
 
-from __future__ import absolute_import
+from __future__ import absolute_import, division
 
 import unittest
 

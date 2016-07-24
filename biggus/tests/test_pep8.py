@@ -18,7 +18,7 @@
 Perform a PEP8 conformance test of the Biggus code base.
 
 """
-from __future__ import absolute_import
+from __future__ import absolute_import, division
 
 import os
 import unittest
