@@ -18,6 +18,7 @@
 
 from __future__ import absolute_import, division, print_function
 from six.moves import (filter, input, map, range, zip)  # noqa
+import six
 
 from abc import ABCMeta, abstractproperty
 
@@ -27,9 +28,7 @@ import numpy.ma as ma
 import biggus
 
 
-class Operator(object):
-    __metaclass__ = ABCMeta
-
+class Operator(six.with_metaclass(ABCMeta, object)):
     @abstractproperty
     def biggus_operator(self):
         pass

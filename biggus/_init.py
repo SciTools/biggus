@@ -56,13 +56,11 @@ class AxisSupportError(Exception):
     """Raised when the operation is not supported over a given axis/axes."""
 
 
-class Engine(object):
+class Engine(six.with_metaclass(ABCMeta, object)):
     """
     Represents a way to evaluate lazy expressions.
 
     """
-
-    __metaclass__ = ABCMeta
 
     @abstractmethod
     def masked_arrays(self, *arrays):
@@ -96,10 +94,8 @@ QUEUE_FINISHED = None
 QUEUE_ABORT = Exception
 
 
-class Node(object):
+class Node(six.with_metaclass(ABCMeta, object)):
     """A node of an expression evaluation graph."""
-
-    __metaclass__ = ABCMeta
 
     def __init__(self):
         self.output_queues = []
@@ -445,13 +441,12 @@ class AllThreadedEngine(Engine):
 
 
 @export
-class Array(object):
+class Array(six.with_metaclass(ABCMeta, object)):
     """
     A virtual array which can be sliced to create smaller virtual
     arrays, or converted to a NumPy ndarray.
 
     """
-    __metaclass__ = ABCMeta
 
     __hash__ = None
 
@@ -2179,9 +2174,7 @@ def save(sources, targets, masked=False):
             target[keys] = array[keys].ndarray()
 
 
-class _StreamsHandler(object):
-    __metaclass__ = ABCMeta
-
+class _StreamsHandler(six.with_metaclass(ABCMeta, object)):
     @abstractmethod
     def finalise(self):
         """
