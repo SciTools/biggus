@@ -16,4 +16,4 @@
 # along with Biggus. If not, see <http://www.gnu.org/licenses/>.
 """Unit tests for `biggus._init`"""
 
-from __future__ import absolute_import, division
+from __future__ import absolute_import, division, print_function

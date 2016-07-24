@@ -16,7 +16,7 @@
 # along with Biggus. If not, see <http://www.gnu.org/licenses/>.
 """Integration tests for maths operations."""
 
-from __future__ import absolute_import, division
+from __future__ import absolute_import, division, print_function
 
 import numpy as np
 import numpy.ma as ma

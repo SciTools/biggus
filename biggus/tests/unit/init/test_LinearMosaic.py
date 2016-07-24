@@ -16,7 +16,7 @@
 # along with Biggus. If not, see <http://www.gnu.org/licenses/>.
 """Unit tests for `biggus.LinearMosaic`."""
 
-from __future__ import absolute_import, division
+from __future__ import absolute_import, division, print_function
 
 import unittest
 
