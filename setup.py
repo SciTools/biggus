@@ -32,7 +32,7 @@ class CleanSource(Command):
 
 setup(
     name='Biggus',
-    version='0.13.0',
+    version='0.14.0',
     url='https://github.com/SciTools/biggus',
     author='Richard Hattersley',
     author_email='rhattersley@gmail.com',
