@@ -1,4 +1,4 @@
-# (C) British Crown Copyright 2014 - 2015, Met Office
+# (C) British Crown Copyright 2014 - 2016, Met Office
 #
 # This file is part of Biggus.
 #
@@ -15,6 +15,10 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with Biggus. If not, see <http://www.gnu.org/licenses/>.
 """Unit tests for `biggus.ArrayStack`."""
+
+from __future__ import absolute_import, division, print_function
+from six.moves import (filter, input, map, range, zip)  # noqa
+import six
 
 import copy
 import unittest
@@ -33,7 +37,7 @@ class Test___init___invalid(unittest.TestCase):
             fill_value = 9
             shape = ()
         bad_arrays = np.array([BadArray()])
-        with self.assertRaisesRegexp(ValueError, 'subclass'):
+        with six.assertRaisesRegex(self, ValueError, 'subclass'):
             ArrayStack(bad_arrays)
 
 
@@ -93,7 +97,7 @@ class Test_multidim_array_stack(unittest.TestCase):
     def test_stack_order_c_numpy_array_t1(self):
         # 1D stack of arrays shape (6,)
         res = ArrayStack.multidim_array_stack(self.arrays, (3, 2), order='C')
-        arr = np.array([i for i in range(6)])
+        arr = np.arange(6)
         target = np.reshape(arr, (3, 2), order='C')
         self.assertTrue(np.array_equal(res.ndarray(), target))
 
@@ -101,7 +105,7 @@ class Test_multidim_array_stack(unittest.TestCase):
         # 1D stack of arrays shape (6,)
         # alternate shape
         res = ArrayStack.multidim_array_stack(self.arrays, (2, 3), order='C')
-        arr = np.array([i for i in range(6)])
+        arr = np.arange(6)
         target = np.reshape(arr, (2, 3), order='C')
         self.assertTrue(np.array_equal(res.ndarray(), target))
 
@@ -118,7 +122,7 @@ class Test_multidim_array_stack(unittest.TestCase):
         # 1D stack of arrays shape (6,)
         # Ensure that the default index ordering corresponds to C.
         res = ArrayStack.multidim_array_stack(self.arrays, (3, 2))
-        arr = np.array([i for i in range(6)])
+        arr = np.arange(6)
         target = np.reshape(arr, (3, 2), order='C')
         self.assertTrue(np.array_equal(res.ndarray(), target))
 
@@ -126,7 +130,7 @@ class Test_multidim_array_stack(unittest.TestCase):
         # Fortran index ordering
         # 1D stack of arrays shape (6,)
         res = ArrayStack.multidim_array_stack(self.arrays, (3, 2), order='F')
-        arr = np.array([i for i in range(6)])
+        arr = np.arange(6)
         target = np.reshape(arr, (3, 2), order='F')
         self.assertTrue(np.array_equal(res.ndarray(), target))
 
@@ -135,7 +139,7 @@ class Test_multidim_array_stack(unittest.TestCase):
         # 1D stack of arrays shape (6,)
         # alternate shape
         res = ArrayStack.multidim_array_stack(self.arrays, (2, 3), order='F')
-        arr = np.array([i for i in range(6)])
+        arr = np.arange(6)
         target = np.reshape(arr, (2, 3), order='F')
         self.assertTrue(np.array_equal(res.ndarray(), target))
 
@@ -143,21 +147,21 @@ class Test_multidim_array_stack(unittest.TestCase):
         # 1D stack of arrays shape (6,)
         # Specifying a stack shape that is not feasible.
         msg = 'total size of new array must be unchanged'
-        with self.assertRaisesRegexp(ValueError, msg):
+        with six.assertRaisesRegex(self, ValueError, msg):
             ArrayStack.multidim_array_stack(self.arrays, (3, 1), order='C')
 
     def test_multidim_stack_multidim(self):
         # Multidim stack of arrays shape (4, 6)
         arrays = [[ConstantArray((), i) for i in range(6)] for i in range(4)]
         msg = 'multidimensional stacks not yet supported'
-        with self.assertRaisesRegexp(ValueError, msg):
+        with six.assertRaisesRegex(self, ValueError, msg):
             ArrayStack.multidim_array_stack(arrays, (3, 2, 4))
 
     def test_order_incorrect_order(self):
         # Specifying an unknown order.
         array1 = fake_array(0)
         array2 = fake_array(0)
-        with self.assertRaisesRegexp(TypeError, 'order not understood'):
+        with six.assertRaisesRegex(self, TypeError, 'order not understood'):
             ArrayStack.multidim_array_stack([array1, array2], (1, 2),
                                             order='random')
 

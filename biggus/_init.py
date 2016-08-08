@@ -14,15 +14,17 @@
 #
 # You should have received a copy of the GNU Lesser General Public License
 # along with Biggus. If not, see <http://www.gnu.org/licenses/>.
-from __future__ import division
+from __future__ import absolute_import, division, print_function
+from six.moves import (filter, input, map, range, zip)  # noqa
+import six
 
 from abc import ABCMeta, abstractproperty, abstractmethod
-import __builtin__
+from six.moves import builtins
 import collections
 import functools
 import itertools
 import threading
-import Queue
+from six.moves import queue
 import sys
 import warnings
 
@@ -50,17 +52,15 @@ def _is_scalar(key):
 
 
 @export
-class AxisSupportError(StandardError):
+class AxisSupportError(Exception):
     """Raised when the operation is not supported over a given axis/axes."""
 
 
-class Engine(object):
+class Engine(six.with_metaclass(ABCMeta, object)):
     """
     Represents a way to evaluate lazy expressions.
 
     """
-
-    __metaclass__ = ABCMeta
 
     @abstractmethod
     def masked_arrays(self, *arrays):
@@ -94,10 +94,8 @@ QUEUE_FINISHED = None
 QUEUE_ABORT = Exception
 
 
-class Node(object):
+class Node(six.with_metaclass(ABCMeta, object)):
     """A node of an expression evaluation graph."""
-
-    __metaclass__ = ABCMeta
 
     def __init__(self):
         self.output_queues = []
@@ -219,11 +217,11 @@ class ConsumerNode(Node):
         """
         Set the given nodes as inputs for this node.
 
-        Creates a limited-size Queue.Queue for each input node and
+        Creates a limited-size queue.Queue for each input node and
         registers each queue as an output of its corresponding node.
 
         """
-        self.input_queues = [Queue.Queue(maxsize=3) for _ in input_nodes]
+        self.input_queues = [queue.Queue(maxsize=3) for _ in input_nodes]
         for input_node, input_queue in zip(input_nodes, self.input_queues):
             input_node.add_output_queue(input_queue)
 
@@ -399,7 +397,7 @@ class AllThreadedEngine(Engine):
             result_nodes = []
             result_threads = []
             for array in self.arrays:
-                iteration_order = range(array.ndim)
+                iteration_order = list(range(array.ndim))
                 node = self._make_node(array, iteration_order, masked)
                 result_node = NdarrayNode(array, masked)
                 result_node.add_input_nodes([node])
@@ -407,7 +405,7 @@ class AllThreadedEngine(Engine):
                 result_nodes.append(result_node)
 
             # Start up all the producer/computation threads.
-            for node in self._node_cache.itervalues():
+            for node in six.itervalues(self._node_cache):
                 node.thread()
 
             # Wait for the result threads to finish.
@@ -422,7 +420,7 @@ class AllThreadedEngine(Engine):
     def _groups(self, arrays):
         # XXX Placeholder implementation which assumes everything
         # is compatible and can be evaluated in parallel.
-        return [self.Group(arrays, range(len(arrays)))]
+        return [self.Group(arrays, list(range(len(arrays))))]
 
     def _evaluate(self, arrays, masked):
         # Figure out which arrays should be evaluated in parallel.
@@ -443,13 +441,12 @@ class AllThreadedEngine(Engine):
 
 
 @export
-class Array(object):
+class Array(six.with_metaclass(ABCMeta, object)):
     """
     A virtual array which can be sliced to create smaller virtual
     arrays, or converted to a NumPy ndarray.
 
     """
-    __metaclass__ = ABCMeta
 
     __hash__ = None
 
@@ -1211,7 +1208,7 @@ class ConstantArray(Array):
 
     """
     def __init__(self, shape, value=0.0, dtype=None):
-        if isinstance(shape, basestring):
+        if isinstance(shape, six.string_types):
             shape = (shape,)
         else:
             try:
@@ -1347,7 +1344,7 @@ class _ArrayAdapter(Array):
                       'size {2}'.format(key.size, axis, size)
                 raise IndexError(msg)
         elif isinstance(key, collections.Iterable) and \
-                not isinstance(key, basestring):
+                not isinstance(key, six.string_types):
             # Make sure we capture the values in case we've
             # been given a one-shot iterable, like a generator.
             key = tuple(key)
@@ -1387,7 +1384,7 @@ class _ArrayAdapter(Array):
                 raise IndexError(msg)
             result_key = tuple(np.array(indices)[new_key])
         elif isinstance(new_key, collections.Iterable) and \
-                not isinstance(new_key, basestring):
+                not isinstance(new_key, six.string_types):
             # Make sure we capture the values in case we've
             # been given a one-shot iterable, like a generator.
             new_key = tuple(new_key)
@@ -1511,7 +1508,7 @@ class NumpyArrayAdapter(_ArrayAdapter):
                 for i, key in tuple_keys:
                     cut_keys[i] = slice(None)
                 array = self.concrete[tuple(cut_keys)]
-                is_scalar = map(_is_scalar, cut_keys)
+                is_scalar = list(map(_is_scalar, cut_keys))
                 dimensions -= np.cumsum(is_scalar)
             else:
                 # Use ellipsis indexing to ensure we have a real ndarray
@@ -1563,7 +1560,7 @@ def _pairwise(iterable):
     """
     a, b = itertools.tee(iterable)
     next(b, None)
-    return itertools.izip(a, b)
+    return zip(a, b)
 
 
 def _groups_of(length, total_length):
@@ -1973,7 +1970,7 @@ class LinearMosaic(Array):
             # then it's safe to just pass the keys to each tile.
             tile = self._tiles[0]
             tiles = [tile[keys] for tile in self._tiles]
-            scalar_keys = filter(_is_scalar, keys)
+            scalar_keys = list(filter(_is_scalar, keys))
             result = LinearMosaic(tiles, axis - len(scalar_keys))
         else:
             axis_lengths = [tile.shape[axis] for tile in self._tiles]
@@ -1988,7 +1985,7 @@ class LinearMosaic(Array):
                 tile_indices[axis] -= offsets[tile_index]
                 result = tile[tuple(tile_indices)]
             elif isinstance(axis_key, (slice, collections.Iterable)) and \
-                    not isinstance(axis_key, basestring):
+                    not isinstance(axis_key, six.string_types):
                 # Find the list of relevant tiles.
                 # NB. If the stride is large enough, this might not be a
                 # contiguous subset of self._tiles.
@@ -1998,7 +1995,7 @@ class LinearMosaic(Array):
                 else:
                     all_axis_indices = tuple(axis_key)
                 tile_indices = np.searchsorted(splits, all_axis_indices) - 1
-                pairs = itertools.izip(all_axis_indices, tile_indices)
+                pairs = zip(all_axis_indices, tile_indices)
                 i = itertools.groupby(pairs, lambda axis_tile: axis_tile[1])
                 tiles = []
                 tile_slice = list(keys)
@@ -2126,7 +2123,7 @@ def _all_slices_inner(shape, always_slices=False):
             if always_slices:
                 slices = [slice(i, i + 1) for i in range(size)]
             else:
-                slices = range(size)
+                slices = list(range(size))
         # Otherwise we have found the dimension that reaches the MAX_CHUNK_SIZE
         # limit, so we apply a range which gives chunk sizes as close to the
         # MAX_CHUNK_SIZE as possible.
@@ -2177,9 +2174,7 @@ def save(sources, targets, masked=False):
             target[keys] = array[keys].ndarray()
 
 
-class _StreamsHandler(object):
-    __metaclass__ = ABCMeta
-
+class _StreamsHandler(six.with_metaclass(ABCMeta, object)):
     @abstractmethod
     def finalise(self):
         """
@@ -2601,7 +2596,7 @@ class _Aggregation(ComputedArray):
         # Reduce the aggregation-axis by the number of prior dimensions that
         # get removed by the indexing operation.
         scalar_axes = map(_is_scalar, keys[:self._axis])
-        result_axis = self._axis - __builtin__.sum(scalar_axes)
+        result_axis = self._axis - builtins.sum(scalar_axes)
         return _Aggregation(self._array[keys], result_axis,
                             self._streams_handler_class,
                             self._masked_streams_handler_class,
@@ -2633,7 +2628,7 @@ def _normalise_axis(axis, array):
     elif _is_scalar(axis):
         axes = (axis,)
     elif (isinstance(axis, collections.Iterable) and
-            not isinstance(axis, (basestring, collections.Mapping)) and
+            not isinstance(axis, (six.string_types, collections.Mapping)) and
             all(map(_is_scalar, axis))):
         axes = tuple(axis)
     else:
@@ -3168,7 +3163,7 @@ def _sliced_shape(shape, keys):
             sliced_shape.append(size)
         elif isinstance(key, np.ndarray) and key.dtype == np.dtype('bool'):
             # Numpy boolean indexing.
-            sliced_shape.append(__builtin__.sum(key))
+            sliced_shape.append(builtins.sum(key))
         elif isinstance(key, (tuple, np.ndarray)):
             sliced_shape.append(len(key))
         elif key is np.newaxis:

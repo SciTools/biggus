@@ -16,6 +16,10 @@
 # along with Biggus. If not, see <http://www.gnu.org/licenses/>.
 """Unit tests for `biggus._Elementwise`."""
 
+from __future__ import absolute_import, division, print_function
+from six.moves import (filter, input, map, range, zip)  # noqa
+import six
+
 from itertools import permutations
 from functools import partial
 import unittest
@@ -51,7 +55,7 @@ class Test__masked_arrays(unittest.TestCase):
     def test_no_masked_array_function(self):
         result = Elementwise(self.masked_array, None, np.sign)
         msg = 'No sign operation defined for masked arrays'
-        with self.assertRaisesRegexp(TypeError, msg):
+        with six.assertRaisesRegex(self, TypeError, msg):
             result.masked_array()
 
 

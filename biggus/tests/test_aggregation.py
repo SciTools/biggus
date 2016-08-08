@@ -1,4 +1,4 @@
-# (C) British Crown Copyright 2013 - 2014, Met Office
+# (C) British Crown Copyright 2013 - 2016, Met Office
 #
 # This file is part of Biggus.
 #
@@ -14,6 +14,10 @@
 #
 # You should have received a copy of the GNU Lesser General Public License
 # along with Biggus. If not, see <http://www.gnu.org/licenses/>.
+from __future__ import absolute_import, division, print_function
+from six.moves import (filter, input, map, range, zip)  # noqa
+import six
+
 import unittest
 
 import numpy as np
@@ -92,8 +96,8 @@ class TestAggregation(unittest.TestCase):
         # Check that the Aggregation raises a TypeError
         # if neither an Array or np.ndarray is given
         msg = "list' object has no attribute 'ndim"
-        with self.assertRaisesRegexp(AttributeError, msg):
-            biggus.mean(range(10), axis=0)
+        with six.assertRaisesRegex(self, AttributeError, msg):
+            biggus.mean([0, 1, 2, 3, 4], axis=0)
 
 
 class TestMdtol(unittest.TestCase):

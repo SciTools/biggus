@@ -15,7 +15,10 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with Biggus. If not, see <http://www.gnu.org/licenses/>.
 """Unit tests for `biggus._init.Array`."""
-from __future__ import division
+
+from __future__ import absolute_import, division, print_function
+from six.moves import (filter, input, map, range, zip)  # noqa
+import six
 
 import sys
 import unittest
@@ -188,7 +191,8 @@ class Test___add__(unittest.TestCase, AssertElementwiseMixin):
 
     def test_other_no_good(self):
         a = FakeArray([2, 2])
-        with self.assertRaisesRegexp(TypeError, 'unsupported operand type'):
+        with six.assertRaisesRegex(self, TypeError,
+                                   'unsupported operand type'):
             a + None
 
     def test___radd__(self):
@@ -208,7 +212,8 @@ class Test___sub__(unittest.TestCase, AssertElementwiseMixin):
 
     def test_other_no_good(self):
         a = FakeArray([2, 2])
-        with self.assertRaisesRegexp(TypeError, 'unsupported operand type'):
+        with six.assertRaisesRegex(self, TypeError,
+                                   'unsupported operand type'):
             a - None
 
     def test___rsub__(self):
@@ -228,7 +233,8 @@ class Test___mul__(unittest.TestCase, AssertElementwiseMixin):
 
     def test_other_no_good(self):
         a = FakeArray([2, 2])
-        with self.assertRaisesRegexp(TypeError, 'unsupported operand type'):
+        with six.assertRaisesRegex(self, TypeError,
+                                   'unsupported operand type'):
             a * None
 
     def test___rmul__(self):
@@ -248,7 +254,8 @@ class Test___floordiv__(unittest.TestCase, AssertElementwiseMixin):
 
     def test_other_no_good(self):
         a = FakeArray([2, 2])
-        with self.assertRaisesRegexp(TypeError, 'unsupported operand type'):
+        with six.assertRaisesRegex(self, TypeError,
+                                   'unsupported operand type'):
             a // None
 
     def test___rfloordiv__(self):
@@ -289,7 +296,8 @@ class Test___trudiv__(unittest.TestCase, AssertElementwiseMixin):
 
     def test_other_no_good(self):
         a = FakeArray([2, 2])
-        with self.assertRaisesRegexp(TypeError, 'unsupported operand type'):
+        with six.assertRaisesRegex(self, TypeError,
+                                   'unsupported operand type'):
             a / None
 
     def test___rtrudiv__(self):
@@ -309,7 +317,8 @@ class Test___pow__(unittest.TestCase, AssertElementwiseMixin):
 
     def test_other_no_good(self):
         a = FakeArray([2, 2])
-        with self.assertRaisesRegexp(TypeError, 'unsupported operand type'):
+        with six.assertRaisesRegex(self, TypeError,
+                                   'unsupported operand type'):
             a ** None
 
     def test___rpow__(self):

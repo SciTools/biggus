@@ -50,6 +50,10 @@ For example::
     mean_error = mean_error.ndarray()
 
 """
+
+from __future__ import absolute_import, division, print_function
+from six.moves import (filter, input, map, range, zip)  # noqa
+
 from ._init import *
 
 

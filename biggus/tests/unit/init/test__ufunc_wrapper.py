@@ -20,6 +20,10 @@ has wrapped.
 
 """
 
+from __future__ import absolute_import, division, print_function
+from six.moves import (filter, input, map, range, zip)  # noqa
+import six
+
 import inspect
 import unittest
 import warnings
@@ -53,12 +57,12 @@ class Test__unary_fn_wrapper(unittest.TestCase):
 
     def test_non_ufunc(self):
         msg = 'not a ufunc'
-        with self.assertRaisesRegexp(TypeError, msg):
+        with six.assertRaisesRegex(self, TypeError, msg):
             _ufunc_wrapper(lambda x: x)
 
     def test_nout2_ufunc(self):
         msg = "Unsupported ufunc 'modf' with 1 input arrays & 2 output arrays."
-        with self.assertRaisesRegexp(ValueError, msg):
+        with six.assertRaisesRegex(self, ValueError, msg):
             _ufunc_wrapper(np.modf)
 
     def test_updates_all_default_name(self):
@@ -121,9 +125,9 @@ class Test_wrapped_functions(unittest.TestCase):
                 warnings.simplefilter("always")
                 actual = result.ndarray()
 
-            self.assertEqual([unicode(warning.message)
+            self.assertEqual([six.text_type(warning.message)
                               for warning in actual_warnings],
-                             [unicode(warning.message)
+                             [six.text_type(warning.message)
                               for warning in expected_warnings])
 
             error_msg = ('biggus.{} produces different results to np.{}:'

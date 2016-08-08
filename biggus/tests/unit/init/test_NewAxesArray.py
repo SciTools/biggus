@@ -16,6 +16,10 @@
 # along with Biggus. If not, see <http://www.gnu.org/licenses/>.
 """Unit tests for `biggus._init.NewAxesArray`."""
 
+from __future__ import absolute_import, division, print_function
+from six.moves import (filter, input, map, range, zip)  # noqa
+import six
+
 import unittest
 
 import numpy as np
@@ -28,25 +32,25 @@ class Test___init__(unittest.TestCase):
     def test_too_few_axes(self):
         in_arr = ConstantArray([3, 2])
         msg = 'must have length 3 but was actually length 2'
-        with self.assertRaisesRegexp(ValueError, msg):
+        with six.assertRaisesRegex(self, ValueError, msg):
             array = NewAxesArray(in_arr, [1, 2])
 
     def test_too_many_axes(self):
         in_arr = ConstantArray([3, 2])
         msg = 'must have length 3 but was actually length 4'
-        with self.assertRaisesRegexp(ValueError, msg):
+        with six.assertRaisesRegex(self, ValueError, msg):
             array = NewAxesArray(in_arr, [1, 2, 0, 1])
 
     def test_new_axes_wrong_dtype(self):
         in_arr = ConstantArray([3, 2])
         msg = 'Only positive integer types may be used for new_axes.'
-        with self.assertRaisesRegexp(ValueError, msg):
+        with six.assertRaisesRegex(self, ValueError, msg):
             array = NewAxesArray(in_arr, [1.1, 1, 1])
 
     def test_new_axes_negative(self):
         in_arr = ConstantArray([1, 2])
         msg = 'Only positive integer types may be used for new_axes.'
-        with self.assertRaisesRegexp(ValueError, msg):
+        with six.assertRaisesRegex(self, ValueError, msg):
             array = NewAxesArray(in_arr, [-1, 0, 1])
 
     def test_successful_attribute(self):
@@ -188,7 +192,7 @@ class Test___getitem__(unittest.TestCase):
 
     def test_new_axis_numpy_array_indexing(self):
         msg = "NewAxesArray indexing not yet supported for ndarray keys."
-        with self.assertRaisesRegexp(NotImplementedError, msg):
+        with six.assertRaisesRegex(self, NotImplementedError, msg):
             self.array_3d[np.array([0, 0, 0]), ...]
 
 

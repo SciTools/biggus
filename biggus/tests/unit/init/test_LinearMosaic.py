@@ -1,4 +1,4 @@
-# (C) British Crown Copyright 2014, Met Office
+# (C) British Crown Copyright 2014 - 2016, Met Office
 #
 # This file is part of Biggus.
 #
@@ -16,6 +16,10 @@
 # along with Biggus. If not, see <http://www.gnu.org/licenses/>.
 """Unit tests for `biggus.LinearMosaic`."""
 
+from __future__ import absolute_import, division, print_function
+from six.moves import (filter, input, map, range, zip)  # noqa
+import six
+
 import unittest
 
 import numpy as np
@@ -32,7 +36,7 @@ class Test___init___invalid(unittest.TestCase):
             ndim = 1
             shape = (4,)
         bad_arrays = [BadArray()]
-        with self.assertRaisesRegexp(ValueError, 'subclass'):
+        with six.assertRaisesRegex(self, ValueError, 'subclass'):
             LinearMosaic(bad_arrays, 0)
 
 

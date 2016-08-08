@@ -1,4 +1,4 @@
-# (C) British Crown Copyright 2015, Met Office
+# (C) British Crown Copyright 2015 - 2016, Met Office
 #
 # This file is part of Biggus.
 #
@@ -19,6 +19,9 @@ Unit tests for `biggus._init._unary_fn_wrapper` and the functions that it
 has wrapped.
 
 """
+
+from __future__ import absolute_import, division, print_function
+from six.moves import (filter, input, map, range, zip)  # noqa
 
 import inspect
 import sys

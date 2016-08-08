@@ -1,4 +1,4 @@
-# (C) British Crown Copyright 2014, Met Office
+# (C) British Crown Copyright 2014 - 2016, Met Office
 #
 # This file is part of Biggus.
 #
@@ -15,6 +15,11 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with Biggus. If not, see <http://www.gnu.org/licenses/>.
 """Unit tests for `biggus` aggregation operators."""
+
+from __future__ import absolute_import, division, print_function
+from six.moves import (filter, input, map, range, zip)  # noqa
+import six
+
 from abc import ABCMeta, abstractproperty
 
 import numpy as np
@@ -23,9 +28,7 @@ import numpy.ma as ma
 import biggus
 
 
-class Operator(object):
-    __metaclass__ = ABCMeta
-
+class Operator(six.with_metaclass(ABCMeta, object)):
     @abstractproperty
     def biggus_operator(self):
         pass

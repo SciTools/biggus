@@ -1,4 +1,4 @@
-# (C) British Crown Copyright 2012, Met Office
+# (C) British Crown Copyright 2012 - 2016, Met Office
 #
 # This file is part of Biggus.
 #
@@ -14,6 +14,9 @@
 #
 # You should have received a copy of the GNU Lesser General Public License
 # along with Biggus. If not, see <http://www.gnu.org/licenses/>.
+from __future__ import absolute_import, division, print_function
+from six.moves import (filter, input, map, range, zip)  # noqa
+
 import unittest
 
 import biggus
