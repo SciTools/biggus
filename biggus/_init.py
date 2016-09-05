@@ -1,4 +1,4 @@
-# (C) British Crown Copyright 2012 - 2016, Met Office
+# (C) British Crown Copyright 2012 - 2017, Met Office
 #
 # This file is part of Biggus.
 #
@@ -25,7 +25,6 @@ import functools
 import itertools
 import threading
 from six.moves import queue
-import sys
 import warnings
 
 import numpy as np
@@ -152,6 +151,27 @@ class ProducerNode(Node):
         self.masked = masked
         super(ProducerNode, self).__init__()
 
+    @staticmethod
+    def chunk_index_gen(shape, iteration_order):
+        # We always slice up the Array into the same chunks, but
+        # the order that we traverse those chunks depends on
+        # `iteration_order`.
+        # We use `numpy.ndindex` to iterate through all the chunks,
+        # but since it always iterates over the last dimension first
+        # we have to transpose `all_cuts` and `cut_shape` ourselves.
+        # Then we have to invert the transposition once we have
+        # identified the relevant slices.
+        all_cuts = _all_slices_inner(shape,
+                                     always_slices=True)
+        all_cuts = [all_cuts[i] for i in iteration_order]
+        cut_shape = tuple(len(cuts) for cuts in all_cuts)
+        inverse_order = [iteration_order.index(i) for
+                         i in range(len(iteration_order))]
+        for cut_indices in np.ndindex(*cut_shape):
+            key = tuple(cuts[i] for cuts, i in zip(all_cuts, cut_indices))
+            key = tuple(key[i] for i in inverse_order)
+            yield key
+
     def run(self):
         """
         Emit the Chunk instances which cover the underlying Array.
@@ -162,23 +182,9 @@ class ProducerNode(Node):
 
         """
         try:
-            # We always slice up the Array into the same chunks, but
-            # the order that we traverse those chunks depends on
-            # `self.iteration_order`.
-            # We use `numpy.ndindex` to iterate through all the chunks,
-            # but since it always iterates over the last dimension first
-            # we have to transpose `all_cuts` and `cut_shape` ourselves.
-            # Then we have to invert the transposition once we have
-            # indentified the relevant slices.
-            all_cuts = _all_slices_inner(self.array.shape,
-                                         always_slices=True)
-            all_cuts = [all_cuts[i] for i in self.iteration_order]
-            cut_shape = tuple(len(cuts) for cuts in all_cuts)
-            inverse_order = [self.iteration_order.index(i) for
-                             i in range(len(self.iteration_order))]
-            for cut_indices in np.ndindex(*cut_shape):
-                key = tuple(cuts[i] for cuts, i in zip(all_cuts, cut_indices))
-                key = tuple(key[i] for i in inverse_order)
+            chunk_index = self.chunk_index_gen(self.array.shape,
+                                               self.iteration_order)
+            for key in chunk_index:
                 # Now we have the slices that describe the next chunk.
                 # For example, key might be equivalent to
                 # `[11:12, 0:3, :, :]`.
@@ -673,7 +679,15 @@ class Array(six.with_metaclass(ABCMeta, object)):
 
 @export
 class ArrayContainer(Array):
-    "A biggus.Array which passes calls through to the contained array."
+    """
+    A biggus.Array which passes calls through to the contained array.
+
+    Note: This array type should be used sparingly - because it contains an
+    array, any subsequent processing has to happen on the entirety of the
+    contained array.  There is already provision for alternative "stream" based
+    approaches (e.g. mean) that avoid this limitation.
+
+    """
     def __init__(self, contained_array):
         self.array = contained_array
 
@@ -2183,6 +2197,14 @@ def save(sources, targets, masked=False):
 
 
 class _StreamsHandler(six.with_metaclass(ABCMeta, object)):
+    """
+    A streams handler is an object who is responsible for transforming array
+    chunks and gathering these together into the desired form. Examples of
+    Streams handling include simple transformations such as changing the
+    datatype, right through to more complex transformations such as computing a
+    mean of the chunks seen.
+
+    """
     @abstractmethod
     def finalise(self):
         """
@@ -2229,10 +2251,31 @@ class _AggregationStreamsHandler(_StreamsHandler):
         order.append(self.axis)
         return order
 
+    def output_keys(self, source_keys):
+        """
+        Given input chunk keys, compute what keys will be needed to put
+        the result into the result array.
+
+        As an example of where this gets used - when we aggregate on a
+        particular axis, the source keys may be ``(0:2, None:None)``, but for
+        an aggregation on axis 0, they would result in target values on
+        dimension 2 only and so be ``(None: None, )``.
+
+        """
+        keys = list(source_keys)
+        # Remove the aggregated axis from the keys.
+        del keys[self.axis]
+        return tuple(keys)
+
+    def output_shape(self, input_shape):
+        shape = list(input_shape)
+        del shape[self.axis]
+        return tuple(shape)
+
     def process_chunks(self, chunks):
         chunk, = chunks
-        keys = list(chunk.keys)
-        del keys[self.axis]
+        keys = self.output_keys(chunk.keys)
+
         result = None
         # If this chunk is a new source of data, do appropriate finalisation
         # of the previous chunk and initialise this one.
@@ -2243,8 +2286,7 @@ class _AggregationStreamsHandler(_StreamsHandler):
                 result = self.finalise()
 
             # Setup the processing of this new chunk.
-            shape = list(chunk.data.shape)
-            del shape[self.axis]
+            shape = self.output_shape(chunk.data.shape)
             self.bootstrap(shape)
             self.current_keys = keys
         self.process_data(chunk.data)
@@ -2252,6 +2294,10 @@ class _AggregationStreamsHandler(_StreamsHandler):
 
     @abstractmethod
     def process_data(self, data):
+        pass
+
+    @abstractmethod
+    def finalise(self, data):
         pass
 
 
@@ -2384,6 +2430,8 @@ class _SumMaskedStreamsHandler(_AggregationStreamsHandler):
 
 
 class _MeanStreamsHandler(_AggregationStreamsHandler):
+    nice_name = 'mean'
+
     def __init__(self, array, axis, mdtol):
         # The mdtol argument is not applicable to non-masked arrays
         # so it is ignored.
