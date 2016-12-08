@@ -199,6 +199,8 @@ class Test__deepcopy__(unittest.TestCase):
                                    order=order, dtype=object))
         copied = copy.deepcopy(orig)
         assert_array_equal(expected, copied.ndarray())
+        for array in copied._stack.flat:
+            self.assertTrue(isinstance(array, NumpyArrayAdapter))
 
     def test_fortran_order(self):
         self.check('f')
