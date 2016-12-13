@@ -1757,10 +1757,10 @@ class ArrayStack(Array):
 
         # Preserve the array ordering by performing an
         # element-wise deepcopy of the stack payload.
-        deepcopy_with_memo = functools.partial(deepcopy, memo=memo)
-        deepcopy_elementwise = np.vectorize(deepcopy_with_memo,
-                                            otypes=[np.object])
-        result = deepcopy_elementwise(self._stack)
+        result = np.array(
+            [deepcopy(array, memo=memo) for array in self._stack.flat],
+            dtype='O')
+        result.shape = self._stack.shape
         memo[id(self._stack)] = result
 
         # Implement a standard deepcopy now we've already dealt
