@@ -17,6 +17,7 @@
 from __future__ import absolute_import, division, print_function
 from six.moves import (filter, input, map, range, zip)  # noqa
 
+import mock
 import unittest
 
 import numpy as np
@@ -61,6 +62,13 @@ class TestChaining(unittest.TestCase):
 
         np.testing.assert_array_equal(result, target)
         np.testing.assert_array_equal(result.mask, target.mask)
+
+    def test_no_array_priority_attribute_present(self):
+        arr = biggus.ConstantArray((3), 1.0)
+        barr = biggus.NumpyArrayAdapter(arr)
+        result = np.array([[1.]]) * barr
+        target = np.array([[1.]]) * arr
+        np.testing.assert_array_equal(result, target)
 
 
 if __name__ == '__main__':
