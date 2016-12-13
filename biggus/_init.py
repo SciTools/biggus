@@ -701,6 +701,10 @@ class ArrayContainer(Array):
         except AttributeError:
             return np.array(self.array)
 
+    @property
+    def __array_priority__(self):
+        return self.array.__array_priority__
+
     def masked_array(self):
         try:
             return self.array.masked_array()
@@ -1321,6 +1325,10 @@ class _ArrayAdapter(Array):
     @property
     def shape(self):
         return _sliced_shape(self.concrete.shape, self._keys)
+
+    @property
+    def __array_priority__(self):
+        return self.concrete.__array_priority__
 
     def _cleanup_new_key(self, key, size, axis):
         """

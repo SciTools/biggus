@@ -17,6 +17,7 @@
 from __future__ import absolute_import, division, print_function
 from six.moves import (filter, input, map, range, zip)  # noqa
 
+import mock
 import unittest
 
 import numpy as np
@@ -48,6 +49,26 @@ class TestChaining(unittest.TestCase):
         expected = np.mean(np.mean(data, axis=1), axis=-1)
         result = mean2.ndarray()
         np.testing.assert_array_equal(result, expected)
+
+    def test_masked_array_numpy_first_biggus_second(self):
+        # Ensure that an operation where the biggus array is second (i.e.
+        # calling the special method of the numpy array not the biggus array,
+        # returns the expected type).
+        mask = [False, True, False]
+        arr = np.ma.array([1, 2, 3], mask=mask)
+        barr = biggus.NumpyArrayAdapter(arr)
+        result = (np.array([[1.]]) * barr).masked_array()
+        target = np.array([[1.]]) * arr
+
+        np.testing.assert_array_equal(result, target)
+        np.testing.assert_array_equal(result.mask, target.mask)
+
+    def test_no_array_priority_attribute_present(self):
+        arr = biggus.ConstantArray((3), 1.0)
+        barr = biggus.NumpyArrayAdapter(arr)
+        result = np.array([[1.]]) * barr
+        target = np.array([[1.]]) * arr
+        np.testing.assert_array_equal(result, target)
 
 
 if __name__ == '__main__':
