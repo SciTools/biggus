@@ -17,12 +17,12 @@
 from __future__ import absolute_import, division, print_function
 from six.moves import (filter, input, map, range, zip)  # noqa
 
-import mock
 import unittest
 
 import numpy as np
 
 import biggus
+from biggus.tests import mock
 
 
 class TestChaining(unittest.TestCase):
