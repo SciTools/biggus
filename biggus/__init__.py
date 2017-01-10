@@ -60,7 +60,7 @@ from ._init import *
 __all__ = _init.__all__
 
 
-__version__ = '0.14.0'
+__version__ = '0.15.0'
 
 
 engine = AllThreadedEngine()
