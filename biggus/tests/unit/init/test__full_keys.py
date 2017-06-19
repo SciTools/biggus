@@ -19,8 +19,8 @@
 from __future__ import absolute_import, division, print_function
 from six.moves import (filter, input, map, range, zip)  # noqa
 
-import unittest
 from distutils.version import LooseVersion
+import unittest
 
 import numpy as np
 from numpy.testing import assert_array_equal

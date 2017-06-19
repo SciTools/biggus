@@ -113,9 +113,6 @@ class _TestAdapter(object):
              (3, 4)],
             [(3, 4), [(slice(None), np.array([0, 0, 0, 0], dtype=bool))],
              (3, 0)],
-            # Boolean indexing (too few indices - zero pad)
-            [(3, 4), [np.array([1, 1], dtype=bool)], (2, 4)],
-            [(3, 4), [(slice(None), np.array([1, 1, 1], dtype=bool))], (3, 3)],
             # Boolean indexing (too many indices)
             [(3, 4), [np.array([1, 1, 1, 0], dtype=bool)], IndexError],
             [(3, 4), [(slice(None), np.array([1, 1, 1, 1, 0], dtype=bool))],
@@ -140,6 +137,7 @@ class _TestAdapter(object):
                     self.assertIsInstance(array, biggus.Array)
                 msg = '\nSrc shape: {!r}\nCuts: {!r}'.format(src_shape, cuts)
                 self.assertEqual(array.shape, target, msg)
+                print('src', src_shape, cuts, target)
                 ndarray = array.ndarray()
                 self.assertEqual(ndarray.shape, target, msg)
 
