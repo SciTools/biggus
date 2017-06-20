@@ -12,6 +12,6 @@ install:
   - if [[ "${TRAVIS_PYTHON_VERSION:0:1}" == '2' ]]; then
       pip install mock;
     fi
-  - pip install $NUMPY
+  - pip install $NUMPY dask
   - pip freeze
 script: "python setup.py test"
