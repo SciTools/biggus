@@ -137,7 +137,6 @@ class _TestAdapter(object):
                     self.assertIsInstance(array, biggus.Array)
                 msg = '\nSrc shape: {!r}\nCuts: {!r}'.format(src_shape, cuts)
                 self.assertEqual(array.shape, target, msg)
-                print('src', src_shape, cuts, target)
                 ndarray = array.ndarray()
                 self.assertEqual(ndarray.shape, target, msg)
 
