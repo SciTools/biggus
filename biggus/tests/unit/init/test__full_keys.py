@@ -19,6 +19,7 @@
 from __future__ import absolute_import, division, print_function
 from six.moves import (filter, input, map, range, zip)  # noqa
 
+from distutils.version import LooseVersion
 import unittest
 
 import numpy as np
@@ -60,10 +61,14 @@ class Test__full_keys(unittest.TestCase):
         self.assertFullSlice((1, Ellipsis), 2,
                              [1, slice(None)])
 
+    @unittest.skipIf(np.__version__ >= LooseVersion('1.12.0'),
+                     'NumPy 1.12.0 does not support double ellipsis.')
     def test_double_ellipsis(self):
         self.assertFullSlice((1, Ellipsis, 1, Ellipsis), 4,
                              [1, slice(None), 1, slice(None)])
 
+    @unittest.skipIf(np.__version__ >= LooseVersion('1.12.0'),
+                     'NumPy 1.12.0 does not support double ellipsis.')
     def test_double_ellipsis_new_axis(self):
         self.assertFullSlice((1, Ellipsis, 1, np.newaxis, Ellipsis), 4,
                              [1, slice(None), 1, None, slice(None)])
@@ -81,6 +86,8 @@ class Test__full_keys(unittest.TestCase):
         self.assertFullSlice((np.newaxis, Ellipsis, None, np.newaxis), 2,
                              [None, slice(None), slice(None), None, None])
 
+    @unittest.skipIf(np.__version__ >= LooseVersion('1.12.0'),
+                     'NumPy 1.12.0 does not support double ellipsis.')
     def test_redundant_ellipsis(self):
         keys = (slice(None), Ellipsis, 0, Ellipsis, slice(None))
         self.assertFullSlice(keys, 4,
