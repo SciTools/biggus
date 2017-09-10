@@ -34,7 +34,7 @@ Biggus was originally developed primarily to provide large data handling for
 `Iris <http://github.com/SciTools/iris>`_ .
 
 For most applications it has now been surpassed by
-`Dask <http://https://github.com/dask/dask>`_, which is used by the majority
+`Dask <https://github.com/dask/dask>`_, which is used by the majority
 of other projects working with virtual arrays.
 
 Thus, **Dask is now generally preferred to Biggus**.
